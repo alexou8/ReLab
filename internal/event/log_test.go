@@ -232,3 +232,45 @@ func mustAppend(t *testing.T, db *store.DB, runID uuid.UUID, p event.Payload) ev
 	}
 	return evt
 }
+
+// TestAppendRefusesAClosedRun covers the invariant replay depends on: a run's
+// terminal event is its last one, so a finished run's story cannot change
+// afterwards. It is enforced on the write path rather than trusted to callers.
+func TestAppendRefusesAClosedRun(t *testing.T) {
+	db := testsupport.DB(t)
+	ctx := context.Background()
+	runID := testsupport.SeedRun(t, db)
+
+	mustAppend(t, db, runID, event.RunStartedPayload{})
+
+	// Close the run the way the engine does: the terminal event is appended
+	// first, then completed_at is set in the same transaction.
+	err := db.InTx(ctx, func(ctx context.Context, tx store.Conn) error {
+		if _, err := event.Append(ctx, tx, runID,
+			event.RunSucceededPayload{TasksSucceeded: 1}, event.Meta{}); err != nil {
+			return err
+		}
+		_, err := tx.Exec(ctx,
+			`UPDATE runs SET status = 'SUCCEEDED', completed_at = now() WHERE id = $1`, runID)
+		return err
+	})
+	if err != nil {
+		t.Fatalf("close run: %v", err)
+	}
+
+	err = db.InTx(ctx, func(ctx context.Context, tx store.Conn) error {
+		_, err := event.Append(ctx, tx, runID, event.WorkerLostPayload{MissedBeats: 5}, event.Meta{})
+		return err
+	})
+	if !errors.Is(err, event.ErrRunClosed) {
+		t.Fatalf("appending to a closed run returned %v, want event.ErrRunClosed", err)
+	}
+
+	events, err := event.Read(ctx, db.Conn(), runID)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if last := events[len(events)-1]; last.Type != event.RunSucceeded {
+		t.Fatalf("the last event is %s, want the terminal RUN_SUCCEEDED", last.Type)
+	}
+}

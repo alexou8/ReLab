@@ -89,22 +89,26 @@ func (e *Engine) expireLeases(ctx context.Context) (expired, requeued, dead int,
 
 		for _, task := range tasks {
 			expired++
-			if err := e.recordLeaseExpiry(ctx, tx, task, now); err != nil {
-				return err
-			}
-			// A cancelled run's in-flight tasks have their leases expired by
-			// CancelRun. Requeueing them would restart work the operator asked
-			// to stop, so they end here instead.
+
+			// Whether the run is still open is checked before anything is
+			// written. A cancelled or completed run's history is closed — the
+			// journal refuses appends to it — so its leftover tasks are
+			// released quietly rather than narrated. Requeueing them would also
+			// restart work an operator asked to stop.
 			finished, err := e.runIsTerminal(ctx, tx, task.RunID)
 			if err != nil {
 				return err
 			}
 			if finished {
-				if err := e.abandonExpired(ctx, tx, task, "run is no longer active", now); err != nil {
+				if err := e.releaseAbandoned(ctx, tx, task, now); err != nil {
 					return err
 				}
 				dead++
 				continue
+			}
+
+			if err := e.recordLeaseExpiry(ctx, tx, task, now); err != nil {
+				return err
 			}
 			def, err := e.definitionForRun(ctx, tx, task.RunID)
 			if err != nil {
@@ -292,8 +296,16 @@ func (e *Engine) releaseLeasesOf(ctx context.Context, tx store.Conn, workerID uu
 // where the explanation is needed.
 func (e *Engine) announceWorkerLost(ctx context.Context, tx store.Conn, workerID uuid.UUID,
 	released int, now time.Time) error {
+	// Only runs that are still open and that the worker was actually holding
+	// work for. A finished run's history is finished — appending to it is
+	// refused — and a worker's death is not part of the story of a run that had
+	// already completed.
 	rows, err := tx.Query(ctx, `
-		SELECT DISTINCT run_id FROM tasks WHERE worker_id = $1`, workerID)
+		SELECT DISTINCT t.run_id
+		FROM tasks t JOIN runs r ON r.id = t.run_id
+		WHERE t.worker_id = $1
+		  AND t.status IN ('LEASED', 'RUNNING')
+		  AND r.completed_at IS NULL`, workerID)
 	if err != nil {
 		return fmt.Errorf("find runs of lost worker %s: %w", workerID, store.Classify(err))
 	}
@@ -372,22 +384,22 @@ func (e *Engine) runIsTerminal(ctx context.Context, tx store.Conn, runID uuid.UU
 	return status.Terminal(), nil
 }
 
-// abandonExpired ends a task whose run is no longer active, without the
-// dead-letter bookkeeping a genuine failure gets: the task did not fail, it was
-// stopped.
-func (e *Engine) abandonExpired(ctx context.Context, tx store.Conn, task Task,
-	reason string, now time.Time) error {
+// releaseAbandoned ends a task whose run has already closed.
+//
+// It writes no event. The run's terminal event is its last by construction, and
+// the task did not fail — its run was cancelled or finished around it — so
+// there is nothing about it that belongs in a history that is already complete.
+// The row is still cleaned up, because a task left LEASED against a dead worker
+// would be re-examined by every subsequent sweep.
+func (e *Engine) releaseAbandoned(ctx context.Context, tx store.Conn, task Task, now time.Time) error {
 	if _, err := tx.Exec(ctx, `
 		UPDATE tasks
 		SET status = 'DEAD', worker_id = NULL, lease_expires_at = NULL,
-		    completed_at = $1, updated_at = $1, error = coalesce(error, $2)
-		WHERE id = $3 AND status IN ('LEASED', 'RUNNING')`,
-		now, reason, task.ID); err != nil {
-		return fmt.Errorf("abandon task %s: %w", task.Name, err)
+		    completed_at = $1, updated_at = $1,
+		    error = coalesce(error, 'run was no longer active when the lease expired')
+		WHERE id = $2 AND status IN ('LEASED', 'RUNNING')`,
+		now, task.ID); err != nil {
+		return fmt.Errorf("release abandoned task %s: %w", task.Name, err)
 	}
-	_, err := event.Append(ctx, tx, task.RunID, event.TaskDeadLetteredPayload{
-		Attempts: task.Attempt,
-		Reason:   reason,
-	}, event.Meta{TaskName: task.Name, OccurredAt: now})
-	return err
+	return nil
 }

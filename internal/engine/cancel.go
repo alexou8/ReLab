@@ -64,14 +64,18 @@ func (e *Engine) CancelRun(ctx context.Context, runID uuid.UUID, reason string) 
 			return fmt.Errorf("expire leases of cancelled run: %w", err)
 		}
 
+		// The event goes first: event.Append refuses to write to a run whose
+		// completed_at is set, which is what keeps the terminal event last.
+		if _, err := event.Append(ctx, tx, runID, event.RunCancelledPayload{Reason: reason},
+			event.Meta{OccurredAt: now}); err != nil {
+			return err
+		}
 		if _, err := tx.Exec(ctx, `
 			UPDATE runs SET status = 'CANCELLED', completed_at = $1, failure_reason = $2
 			WHERE id = $3`, now, nullString(reason), runID); err != nil {
 			return fmt.Errorf("cancel run: %w", err)
 		}
-		_, err := event.Append(ctx, tx, runID, event.RunCancelledPayload{Reason: reason},
-			event.Meta{OccurredAt: now})
-		return err
+		return nil
 	})
 	if err != nil {
 		return fmt.Errorf("engine: cancel run %s: %w", runID, err)

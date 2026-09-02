@@ -98,3 +98,23 @@ that performs a recorded side effect and then `SIGKILL`s its own process before
 the outcome can be acknowledged. The task is recovered by lease expiry and
 retried; the ledger holds exactly one effect, the journal carries
 `SIDE_EFFECT_SKIPPED`, and the recorded result is still the first attempt's.
+
+## M4 — Replay
+
+```
+M4.1 RunState and TaskState, comparison-relevant only | orchestrator | done | internal/replay
+M4.2 pure reducer, exhaustive over every event type   | orchestrator | done | internal/replay
+M4.3 divergence categories and comparison             | orchestrator | done | internal/replay
+M4.4 artifact verification against the artifacts table| orchestrator | done | internal/replay
+M4.5 `relab replay [--diff]` with a non-zero exit     | orchestrator | done | internal/cli
+M4.6 terminal-event-is-last enforced in event.Append  | orchestrator | done | internal/event
+M4.7 decision 0006                                    | orchestrator | done | docs/decisions
+```
+
+**Acceptance:** `TestReplayOfRecordedRunsMatches` records ten runs, three of
+which recover from a lost worker, and replays every one to a state that matches
+its re-reduction and to artifact hashes that agree with the artifacts table.
+`TestCorruptedEventProducesACategoryNotACrash` corrupts a journal four different
+ways — a deleted event, an unknown type, a stripped payload version, a future
+payload version — and asserts each produces a specific, named failure rather
+than a panic or a plausible-looking wrong answer.

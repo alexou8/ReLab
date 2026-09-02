@@ -8,6 +8,8 @@ import (
 	"github.com/alexou8/relab/internal/engine"
 	"github.com/alexou8/relab/internal/event"
 	"github.com/alexou8/relab/internal/idem"
+
+	"github.com/google/uuid"
 )
 
 const effectWorkflow = `
@@ -34,10 +36,15 @@ func TestEffectSurvivesACrashBeforeAcknowledgement(t *testing.T) {
 	env := newEnv(t)
 	run := env.createRun(t, effectWorkflow)
 
-	// The worker is armed to die on the first attempt only.
+	// The armed worker runs alone until it has actually performed the effect.
+	// Starting a second worker alongside it would let the survivor win the
+	// claim, run the task normally, and pass this test without ever exercising
+	// the crash — a test that reports success for the wrong reason.
 	env.startWorkerWith(t, "suicidal", map[string]string{"RELAB_EFFECT_THEN_DIE": "1"})
+	env.waitForEffect(t, run, 45*time.Second)
 
-	// A second worker to pick the task up once the first one's lease expires.
+	// The effect is now recorded and the worker that performed it is dead. Only
+	// lease expiry can bring the task back.
 	env.startWorker(t, "survivor")
 
 	final := env.waitForTerminalRun(t, run, 90*time.Second)
@@ -87,4 +94,24 @@ func TestEffectSurvivesACrashBeforeAcknowledgement(t *testing.T) {
 	}
 
 	assertNoDuplicateAttempt(t, events)
+}
+
+// waitForEffect blocks until the run has recorded a side effect, which is the
+// point after which the armed worker has certainly died.
+func (e *env) waitForEffect(t *testing.T, runID uuid.UUID, timeout time.Duration) {
+	t.Helper()
+	ledger := idem.New(e.db)
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		count, err := ledger.CountForRun(e.ctx, runID)
+		if err != nil {
+			t.Fatalf("count effects: %v", err)
+		}
+		if count > 0 {
+			return
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+	e.dumpTimeline(t, runID)
+	t.Fatalf("no side effect was recorded within %s; the armed worker never ran the task", timeout)
 }

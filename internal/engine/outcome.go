@@ -308,20 +308,33 @@ func (e *Engine) settleRun(ctx context.Context, tx store.Conn, runID uuid.UUID, 
 		payload = event.RunFailedPayload{Reason: "tasks dead-lettered", Detail: reason}
 	}
 
-	// The status guard means the first caller to observe completion closes the
-	// run and the rest are no-ops, without an explicit lock.
-	tag, err := tx.Exec(ctx, `
-		UPDATE runs SET status = $1, completed_at = $2, failure_reason = $3
-		WHERE id = $4 AND status IN ('QUEUED', 'RUNNING')`,
-		string(status), now, nullString(reason), runID)
-	if err != nil {
+	// The run row is locked before anything is written, so two callers
+	// observing completion at once serialise here and only the first closes it.
+	// The lock replaces what used to be an optimistic status guard on the
+	// UPDATE, which could not work any more: the terminal event has to be
+	// appended *before* completed_at is set, because event.Append refuses to
+	// write to a closed run.
+	var current RunStatus
+	if err := tx.QueryRow(ctx,
+		`SELECT status FROM runs WHERE id = $1 FOR UPDATE`, runID).Scan(&current); err != nil {
+		return fmt.Errorf("lock run %s: %w", runID, store.Classify(err))
+	}
+	if current != RunQueued && current != RunRunning {
+		return nil // already closed, or cancelled by an operator
+	}
+	if err := current.Transition(status); err != nil {
+		return err
+	}
+
+	if _, err := event.Append(ctx, tx, runID, payload, event.Meta{OccurredAt: now}); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `
+		UPDATE runs SET status = $1, completed_at = $2, failure_reason = $3 WHERE id = $4`,
+		string(status), now, nullString(reason), runID); err != nil {
 		return fmt.Errorf("close run %s: %w", runID, err)
 	}
-	if tag.RowsAffected() == 0 {
-		return nil
-	}
-	_, err = event.Append(ctx, tx, runID, payload, event.Meta{OccurredAt: now})
-	return err
+	return nil
 }
 
 func succeededTasks(ctx context.Context, conn store.Conn, runID uuid.UUID) (map[string]bool, error) {

@@ -3,6 +3,7 @@ package event
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -67,11 +68,27 @@ func Append(ctx context.Context, tx Appender, runID uuid.UUID, p Payload, meta M
 	// round trip and takes the run row's lock as a side effect. A separate
 	// SELECT max(seq) would need its own explicit lock and would still be a
 	// second statement.
+	// The guard on completed_at is what enforces "a run's terminal event is its
+	// last one". Replay relies on that invariant to know a history is complete,
+	// and an event arriving after the run closed would make a finished run's
+	// story keep changing. Callers that close a run append the terminal event
+	// first and set completed_at afterwards, within the same transaction.
 	var seq int64
 	err = tx.QueryRow(ctx,
-		`UPDATE runs SET event_seq = event_seq + 1 WHERE id = $1 RETURNING event_seq`,
+		`UPDATE runs SET event_seq = event_seq + 1
+		 WHERE id = $1 AND completed_at IS NULL
+		 RETURNING event_seq`,
 		runID).Scan(&seq)
 	if err != nil {
+		if errors.Is(store.Classify(err), store.ErrNotFound) {
+			// Either the run does not exist or it is already closed. Tell the
+			// two apart, because they need different fixes.
+			var closed bool
+			if probeErr := tx.QueryRow(ctx,
+				`SELECT completed_at IS NOT NULL FROM runs WHERE id = $1`, runID).Scan(&closed); probeErr == nil && closed {
+				return Event{}, fmt.Errorf("event: append %s to run %s: %w", typ, runID, ErrRunClosed)
+			}
+		}
 		return Event{}, fmt.Errorf("event: allocate seq for run %s: %w", runID, store.Classify(err))
 	}
 
@@ -170,6 +187,11 @@ func ReadFrom(ctx context.Context, conn store.Conn, runID uuid.UUID, afterSeq in
 	}
 	return events, nil
 }
+
+// ErrRunClosed reports an append to a run that has already reached a terminal
+// state. It is a bug in the caller: a finished run's history is finished, and a
+// tool whose job is to say what happened cannot have that change afterwards.
+var ErrRunClosed = errors.New("event: the run is closed and its history cannot be added to")
 
 // ErrGap reports a hole in a run's sequence. It is a data integrity failure,
 // not a transient condition, and callers should surface it rather than retry.
