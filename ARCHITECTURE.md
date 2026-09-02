@@ -169,6 +169,18 @@ is no client-side state: the dashboard reads, and it does not write.
 Pages are `force-dynamic`. A cached dashboard would be actively misleading
 during the one thing it exists to observe.
 
+One client component exists, `nav.tsx`, and it is one so the current section can
+carry `aria-current`. Filters on the runs list and the timeline are links
+carrying query parameters rather than controls: a filtered view is then a URL
+that can be sent to whoever is being asked to look, and the page needs no
+JavaScript to produce one.
+
+The dashboard has two data sources, chosen once by whether `RELAB_API_URL` is
+set: the live read API, or `web/src/demo/snapshot.json`, a `relab export` of
+real runs that a deployment with no reachable control plane serves instead. They
+never mix — a configured API that is down is an error state — and the recording
+is in the API's own shapes, so nothing in the pages gets a second code path.
+
 ## Background work
 
 | Loop | Where | Interval | Purpose |
@@ -220,7 +232,15 @@ killable workers, and the dashboard. One image serves the control plane and the
 workers; the command decides which it is. Both run as non-root.
 
 Migrations run on start-up under an advisory lock, so the processes cannot race
-the same DDL.
+the same DDL. `/readyz` refuses traffic when the applied schema is not the
+version the binary carries, so an older process against a newer database stays
+out of rotation rather than failing one query at a time.
+
+The dashboard deploys separately, to a static host — the repository is set up
+for Vercel with `web` as the root directory. The workers do not go with it: a
+worker holds a lease, renews it on a timer and may run for minutes, and a
+request handler cannot be any of those things. `docs/deployment.md` has the
+whole picture and the parts of it that are not reassuring.
 
 ## CI/CD
 

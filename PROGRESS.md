@@ -191,3 +191,40 @@ A.6 every test named in docs/reliability.md verified to  | orchestrator | done |
 
 **No TODOs, commented-out code, debug prints or unused module dependencies
 remain in first-party code.**
+
+---
+
+## Public deployment
+
+Making the dashboard deployable on its own, and fixing what that exposed.
+
+```
+D.1 `relab run --scenario` recorded the scenario's name    | orchestrator | done | internal/cli
+    and injected none of its faults; runs were labelled    |              |      |
+    with a scenario that never ran                         |              |      |
+D.2 a worker that shut down cleanly was declared LOST      | orchestrator | done | internal/store, internal/engine,
+    five beats later, so a redeploy read as a crash;       |              |      | internal/worker
+    migration 002 adds STOPPED, written by the process     |              |      |
+D.3 `relab test`'s pool and LocalRunner abandoned their    | orchestrator | done | internal/cli, internal/engine
+    workers; the demo went from 7 lost workers to the 2    |              |      |
+    the scenarios actually kill                            |              |      |
+D.4 `/readyz` passed on a schema the binary did not carry  | orchestrator | done | internal/api, internal/store
+D.5 internal/api had no tests; now covers read-only-ness,  | orchestrator | done | internal/api
+    id validation, error-body leakage, limit capping and   |              |      |
+    readiness                                              |              |      |
+D.6 two scenarios added: a crash after a recorded side     | orchestrator | done | examples/scenarios
+    effect, and an upstream that never recovers (the       |              |      |
+    first corpus entry asserting a FAILED run)             |              |      |
+D.7 `relab export` and scripts/record-demo.sh; the         | orchestrator | done | internal/cli, scripts, web
+    dashboard serves that recording where no control       |              |      |
+    plane is reachable, labelled as one                    |              |      |
+D.8 run detail rewritten around a verdict, event-counted   | orchestrator | done | web
+    evidence and a filterable timeline; accessibility      |              |      |
+    and responsive work alongside                          |              |      |
+D.9 docs/deployment.md written; SECURITY.md, ARCHITECTURE  | orchestrator | done | (docs)
+    .md, DATA.md, README.md reconciled with it             |              |      |
+```
+
+**Not done:** the Vercel project itself. The connected account cannot create
+projects, so the import is a manual step; every setting it needs is pinned in
+`web/vercel.json` and written out in `docs/deployment.md` §3.
