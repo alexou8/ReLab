@@ -1,0 +1,2263 @@
+{
+  "recorded_at": "2026-09-02T23:31:11.349830201Z",
+  "relab_version": "241c136-dirty",
+  "note": "Recorded by scripts/record-demo.sh against real PostgreSQL and real worker processes. The worker crashes are SIGKILL, not simulated.",
+  "runs": [
+    {
+      "run": {
+        "ID": "96ea5bfd-1536-42c2-ac1b-72b7101efeb7",
+        "WorkflowID": "1deab810-ef81-4c97-bb92-b558abe9330d",
+        "WorkflowName": "effectful",
+        "WorkflowVer": 1,
+        "Status": "SUCCEEDED",
+        "ScenarioName": "worker-crash-after-effect",
+        "Seed": 1337,
+        "EventSeq": 23,
+        "CorrelationID": "",
+        "FailureReason": "",
+        "CreatedAt": "2026-09-02T23:31:09.411212Z",
+        "StartedAt": "2026-09-02T23:31:09.439943Z",
+        "CompletedAt": "2026-09-02T23:31:11.299163Z"
+      },
+      "tasks": [
+        {
+          "ID": "4faf7050-b30b-4d2d-86aa-05864823a741",
+          "RunID": "96ea5bfd-1536-42c2-ac1b-72b7101efeb7",
+          "Name": "charge",
+          "Attempt": 2,
+          "MaxAttempts": 3,
+          "Status": "SUCCEEDED",
+          "WorkerID": "611a59e4-70e0-4980-a80c-c4e4373cb4b4",
+          "LeaseExpiresAt": null,
+          "ScheduledAt": "2026-09-02T23:31:11.220414Z",
+          "StartedAt": "2026-09-02T23:31:11.255466Z",
+          "CompletedAt": "2026-09-02T23:31:11.259463Z",
+          "Output": {
+            "effect": {
+              "charged": true,
+              "by_attempt": 1
+            },
+            "attempt": 2
+          },
+          "Error": "",
+          "IdempotencyKey": "96ea5bfd-1536-42c2-ac1b-72b7101efeb7:charge"
+        },
+        {
+          "ID": "a9d960b0-ec41-4a9c-913d-5ac2b10e99e9",
+          "RunID": "96ea5bfd-1536-42c2-ac1b-72b7101efeb7",
+          "Name": "import",
+          "Attempt": 1,
+          "MaxAttempts": 3,
+          "Status": "SUCCEEDED",
+          "WorkerID": "611a59e4-70e0-4980-a80c-c4e4373cb4b4",
+          "LeaseExpiresAt": null,
+          "ScheduledAt": "2026-09-02T23:31:09.411212Z",
+          "StartedAt": "2026-09-02T23:31:09.439943Z",
+          "CompletedAt": "2026-09-02T23:31:09.44316Z",
+          "Output": {
+            "rows": 1000
+          },
+          "Error": "",
+          "IdempotencyKey": "96ea5bfd-1536-42c2-ac1b-72b7101efeb7:import"
+        },
+        {
+          "ID": "595c8e43-0348-4885-8d8d-efe48426bb06",
+          "RunID": "96ea5bfd-1536-42c2-ac1b-72b7101efeb7",
+          "Name": "report",
+          "Attempt": 1,
+          "MaxAttempts": 3,
+          "Status": "SUCCEEDED",
+          "WorkerID": "305c1862-7cf6-4fc1-904e-78c187ce1342",
+          "LeaseExpiresAt": null,
+          "ScheduledAt": "2026-09-02T23:31:11.259463Z",
+          "StartedAt": "2026-09-02T23:31:11.295679Z",
+          "CompletedAt": "2026-09-02T23:31:11.299163Z",
+          "Output": {
+            "inputs": 1
+          },
+          "Error": "",
+          "IdempotencyKey": "96ea5bfd-1536-42c2-ac1b-72b7101efeb7:report"
+        }
+      ],
+      "events": [
+        {
+          "RunID": "96ea5bfd-1536-42c2-ac1b-72b7101efeb7",
+          "Seq": 1,
+          "Type": "RUN_CREATED",
+          "TaskName": "",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "seed": 1337,
+            "scenario_hash": "cd4856e568cadae8e19cba130e470cac5b8ac1abb4277f68f679523ad0e628ec",
+            "scenario_name": "worker-crash-after-effect",
+            "workflow_name": "effectful",
+            "definition_hash": "480bc5f1f741608e984104b1b9ef0acf5930a5d6622b750a2df5f1fe2f75c7ee",
+            "workflow_version": 1
+          },
+          "OccurredAt": "2026-09-02T23:31:09.411212Z"
+        },
+        {
+          "RunID": "96ea5bfd-1536-42c2-ac1b-72b7101efeb7",
+          "Seq": 2,
+          "Type": "TASK_SCHEDULED",
+          "TaskName": "import",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "attempt": 0,
+            "scheduled_at": "2026-09-02T23:31:09.411212807Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:09.411212Z"
+        },
+        {
+          "RunID": "96ea5bfd-1536-42c2-ac1b-72b7101efeb7",
+          "Seq": 3,
+          "Type": "RUN_QUEUED",
+          "TaskName": "",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "task_count": 3
+          },
+          "OccurredAt": "2026-09-02T23:31:09.411212Z"
+        },
+        {
+          "RunID": "96ea5bfd-1536-42c2-ac1b-72b7101efeb7",
+          "Seq": 4,
+          "Type": "TASK_LEASED",
+          "TaskName": "import",
+          "WorkerID": "611a59e4-70e0-4980-a80c-c4e4373cb4b4",
+          "Payload": {
+            "v": 1,
+            "attempt": 1,
+            "lease_expires_at": "2026-09-02T23:31:11.431167845Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:09.431167Z"
+        },
+        {
+          "RunID": "96ea5bfd-1536-42c2-ac1b-72b7101efeb7",
+          "Seq": 5,
+          "Type": "TASK_STARTED",
+          "TaskName": "import",
+          "WorkerID": "611a59e4-70e0-4980-a80c-c4e4373cb4b4",
+          "Payload": {
+            "v": 1,
+            "attempt": 1,
+            "handler": "import_csv"
+          },
+          "OccurredAt": "2026-09-02T23:31:09.439943Z"
+        },
+        {
+          "RunID": "96ea5bfd-1536-42c2-ac1b-72b7101efeb7",
+          "Seq": 6,
+          "Type": "RUN_STARTED",
+          "TaskName": "",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1
+          },
+          "OccurredAt": "2026-09-02T23:31:09.439943Z"
+        },
+        {
+          "RunID": "96ea5bfd-1536-42c2-ac1b-72b7101efeb7",
+          "Seq": 7,
+          "Type": "TASK_SUCCEEDED",
+          "TaskName": "import",
+          "WorkerID": "611a59e4-70e0-4980-a80c-c4e4373cb4b4",
+          "Payload": {
+            "v": 1,
+            "output": {
+              "rows": 1000
+            },
+            "attempt": 1,
+            "artifacts": [
+              {
+                "name": "imported.csv",
+                "size": 9,
+                "sha256": "6eb31300aed462386f9f52f25d0155b3ca1a9ebce4c811950777282d69a81c64",
+                "content_type": "text/csv"
+              }
+            ],
+            "duration_ms": 0
+          },
+          "OccurredAt": "2026-09-02T23:31:09.44316Z"
+        },
+        {
+          "RunID": "96ea5bfd-1536-42c2-ac1b-72b7101efeb7",
+          "Seq": 8,
+          "Type": "TASK_SCHEDULED",
+          "TaskName": "charge",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "attempt": 0,
+            "depends_on": [
+              "import"
+            ],
+            "scheduled_at": "2026-09-02T23:31:09.443160569Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:09.44316Z"
+        },
+        {
+          "RunID": "96ea5bfd-1536-42c2-ac1b-72b7101efeb7",
+          "Seq": 9,
+          "Type": "TASK_LEASED",
+          "TaskName": "charge",
+          "WorkerID": "ec633076-8f0b-400c-b7e8-dc38b38bb823",
+          "Payload": {
+            "v": 1,
+            "attempt": 1,
+            "lease_expires_at": "2026-09-02T23:31:11.634095745Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:09.634095Z"
+        },
+        {
+          "RunID": "96ea5bfd-1536-42c2-ac1b-72b7101efeb7",
+          "Seq": 10,
+          "Type": "TASK_STARTED",
+          "TaskName": "charge",
+          "WorkerID": "ec633076-8f0b-400c-b7e8-dc38b38bb823",
+          "Payload": {
+            "v": 1,
+            "attempt": 1,
+            "handler": "charge_once"
+          },
+          "OccurredAt": "2026-09-02T23:31:09.643824Z"
+        },
+        {
+          "RunID": "96ea5bfd-1536-42c2-ac1b-72b7101efeb7",
+          "Seq": 11,
+          "Type": "FAULT_INJECTED",
+          "TaskName": "charge",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "draw": 0,
+            "seed": 1337,
+            "scenario": "worker-crash-after-effect",
+            "fault_type": "worker-crash",
+            "fault_point": "before-task-ack"
+          },
+          "OccurredAt": "2026-09-02T23:31:09.648692Z"
+        },
+        {
+          "RunID": "96ea5bfd-1536-42c2-ac1b-72b7101efeb7",
+          "Seq": 12,
+          "Type": "WORKER_LOST",
+          "TaskName": "",
+          "WorkerID": "ec633076-8f0b-400c-b7e8-dc38b38bb823",
+          "Payload": {
+            "v": 1,
+            "missed_beats": 5,
+            "leases_released": 1
+          },
+          "OccurredAt": "2026-09-02T23:31:11.020985Z"
+        },
+        {
+          "RunID": "96ea5bfd-1536-42c2-ac1b-72b7101efeb7",
+          "Seq": 13,
+          "Type": "TASK_LEASE_EXPIRED",
+          "TaskName": "charge",
+          "WorkerID": "ec633076-8f0b-400c-b7e8-dc38b38bb823",
+          "Payload": {
+            "v": 1,
+            "attempt": 1,
+            "lease_expired_at": "2026-09-02T23:31:11.020985Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:11.220414Z"
+        },
+        {
+          "RunID": "96ea5bfd-1536-42c2-ac1b-72b7101efeb7",
+          "Seq": 14,
+          "Type": "TASK_REQUEUED",
+          "TaskName": "charge",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "reason": "lease expired",
+            "attempt": 1,
+            "next_attempt": 2
+          },
+          "OccurredAt": "2026-09-02T23:31:11.220414Z"
+        },
+        {
+          "RunID": "96ea5bfd-1536-42c2-ac1b-72b7101efeb7",
+          "Seq": 15,
+          "Type": "TASK_LEASED",
+          "TaskName": "charge",
+          "WorkerID": "611a59e4-70e0-4980-a80c-c4e4373cb4b4",
+          "Payload": {
+            "v": 1,
+            "attempt": 2,
+            "lease_expires_at": "2026-09-02T23:31:13.251555072Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:11.251555Z"
+        },
+        {
+          "RunID": "96ea5bfd-1536-42c2-ac1b-72b7101efeb7",
+          "Seq": 16,
+          "Type": "TASK_STARTED",
+          "TaskName": "charge",
+          "WorkerID": "611a59e4-70e0-4980-a80c-c4e4373cb4b4",
+          "Payload": {
+            "v": 1,
+            "attempt": 2,
+            "handler": "charge_once"
+          },
+          "OccurredAt": "2026-09-02T23:31:11.255466Z"
+        },
+        {
+          "RunID": "96ea5bfd-1536-42c2-ac1b-72b7101efeb7",
+          "Seq": 17,
+          "Type": "SIDE_EFFECT_SKIPPED",
+          "TaskName": "charge",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "attempt": 2,
+            "first_attempt": 1,
+            "idempotency_key": "96ea5bfd-1536-42c2-ac1b-72b7101efeb7:charge:external-charge"
+          },
+          "OccurredAt": "2026-09-02T23:31:11.257794Z"
+        },
+        {
+          "RunID": "96ea5bfd-1536-42c2-ac1b-72b7101efeb7",
+          "Seq": 18,
+          "Type": "TASK_SUCCEEDED",
+          "TaskName": "charge",
+          "WorkerID": "611a59e4-70e0-4980-a80c-c4e4373cb4b4",
+          "Payload": {
+            "v": 1,
+            "output": {
+              "effect": {
+                "charged": true,
+                "by_attempt": 1
+              },
+              "attempt": 2
+            },
+            "attempt": 2,
+            "duration_ms": 2
+          },
+          "OccurredAt": "2026-09-02T23:31:11.259463Z"
+        },
+        {
+          "RunID": "96ea5bfd-1536-42c2-ac1b-72b7101efeb7",
+          "Seq": 19,
+          "Type": "TASK_SCHEDULED",
+          "TaskName": "report",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "attempt": 0,
+            "depends_on": [
+              "charge"
+            ],
+            "scheduled_at": "2026-09-02T23:31:11.25946313Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:11.259463Z"
+        },
+        {
+          "RunID": "96ea5bfd-1536-42c2-ac1b-72b7101efeb7",
+          "Seq": 20,
+          "Type": "TASK_LEASED",
+          "TaskName": "report",
+          "WorkerID": "305c1862-7cf6-4fc1-904e-78c187ce1342",
+          "Payload": {
+            "v": 1,
+            "attempt": 1,
+            "lease_expires_at": "2026-09-02T23:31:13.28504691Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:11.285046Z"
+        },
+        {
+          "RunID": "96ea5bfd-1536-42c2-ac1b-72b7101efeb7",
+          "Seq": 21,
+          "Type": "TASK_STARTED",
+          "TaskName": "report",
+          "WorkerID": "305c1862-7cf6-4fc1-904e-78c187ce1342",
+          "Payload": {
+            "v": 1,
+            "attempt": 1,
+            "handler": "summarize"
+          },
+          "OccurredAt": "2026-09-02T23:31:11.295679Z"
+        },
+        {
+          "RunID": "96ea5bfd-1536-42c2-ac1b-72b7101efeb7",
+          "Seq": 22,
+          "Type": "TASK_SUCCEEDED",
+          "TaskName": "report",
+          "WorkerID": "305c1862-7cf6-4fc1-904e-78c187ce1342",
+          "Payload": {
+            "v": 1,
+            "output": {
+              "inputs": 1
+            },
+            "attempt": 1,
+            "artifacts": [
+              {
+                "name": "summary.json",
+                "size": 65,
+                "sha256": "6daf054bc88db6a09bffab080e3e33c0d9b070208a7517141a96c34ebc8938e3",
+                "content_type": "application/json"
+              }
+            ],
+            "duration_ms": 0
+          },
+          "OccurredAt": "2026-09-02T23:31:11.299163Z"
+        },
+        {
+          "RunID": "96ea5bfd-1536-42c2-ac1b-72b7101efeb7",
+          "Seq": 23,
+          "Type": "RUN_SUCCEEDED",
+          "TaskName": "",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "tasks_succeeded": 3
+          },
+          "OccurredAt": "2026-09-02T23:31:11.299163Z"
+        }
+      ]
+    },
+    {
+      "run": {
+        "ID": "bb06d758-2500-4193-81ca-51fcbf0a51da",
+        "WorkflowID": "49bff2e9-d723-4188-934d-18ee82a781a6",
+        "WorkflowName": "data-pipeline",
+        "WorkflowVer": 1,
+        "Status": "SUCCEEDED",
+        "ScenarioName": "worker-crash-during-analyze",
+        "Seed": 42,
+        "EventSeq": 26,
+        "CorrelationID": "",
+        "FailureReason": "",
+        "CreatedAt": "2026-09-02T23:31:07.078429Z",
+        "StartedAt": "2026-09-02T23:31:07.10659Z",
+        "CompletedAt": "2026-09-02T23:31:09.360298Z"
+      },
+      "tasks": [
+        {
+          "ID": "7d5d4ced-b0e2-4012-95ae-8777a0436bb3",
+          "RunID": "bb06d758-2500-4193-81ca-51fcbf0a51da",
+          "Name": "analyze",
+          "Attempt": 2,
+          "MaxAttempts": 3,
+          "Status": "SUCCEEDED",
+          "WorkerID": "423bf373-75eb-4d76-bec4-ddc64f01a5fd",
+          "LeaseExpiresAt": null,
+          "ScheduledAt": "2026-09-02T23:31:09.285826Z",
+          "StartedAt": "2026-09-02T23:31:09.327631Z",
+          "CompletedAt": "2026-09-02T23:31:09.329378Z",
+          "Output": {
+            "mean": 497,
+            "count": 994
+          },
+          "Error": "",
+          "IdempotencyKey": "bb06d758-2500-4193-81ca-51fcbf0a51da:analyze"
+        },
+        {
+          "ID": "b06a1aa1-6a2c-423f-a84a-92c0396d1f92",
+          "RunID": "bb06d758-2500-4193-81ca-51fcbf0a51da",
+          "Name": "import",
+          "Attempt": 1,
+          "MaxAttempts": 3,
+          "Status": "SUCCEEDED",
+          "WorkerID": "6f14b10a-214a-407c-837a-3db87361c4b2",
+          "LeaseExpiresAt": null,
+          "ScheduledAt": "2026-09-02T23:31:07.078429Z",
+          "StartedAt": "2026-09-02T23:31:07.10659Z",
+          "CompletedAt": "2026-09-02T23:31:07.110009Z",
+          "Output": {
+            "rows": 1000
+          },
+          "Error": "",
+          "IdempotencyKey": "bb06d758-2500-4193-81ca-51fcbf0a51da:import"
+        },
+        {
+          "ID": "a10a5039-4aa6-4440-8fe8-0c903cc2af6b",
+          "RunID": "bb06d758-2500-4193-81ca-51fcbf0a51da",
+          "Name": "report",
+          "Attempt": 1,
+          "MaxAttempts": 3,
+          "Status": "SUCCEEDED",
+          "WorkerID": "63a9b177-5d37-4738-85ad-ab5258b08f5b",
+          "LeaseExpiresAt": null,
+          "ScheduledAt": "2026-09-02T23:31:09.329378Z",
+          "StartedAt": "2026-09-02T23:31:09.357752Z",
+          "CompletedAt": "2026-09-02T23:31:09.360298Z",
+          "Output": {
+            "bytes": 26
+          },
+          "Error": "",
+          "IdempotencyKey": "bb06d758-2500-4193-81ca-51fcbf0a51da:report"
+        },
+        {
+          "ID": "abdc1074-221f-4e83-ad7d-52fb086802e3",
+          "RunID": "bb06d758-2500-4193-81ca-51fcbf0a51da",
+          "Name": "validate",
+          "Attempt": 1,
+          "MaxAttempts": 3,
+          "Status": "SUCCEEDED",
+          "WorkerID": "423bf373-75eb-4d76-bec4-ddc64f01a5fd",
+          "LeaseExpiresAt": null,
+          "ScheduledAt": "2026-09-02T23:31:07.110009Z",
+          "StartedAt": "2026-09-02T23:31:07.311799Z",
+          "CompletedAt": "2026-09-02T23:31:07.314923Z",
+          "Output": {
+            "valid": 994,
+            "invalid": 6
+          },
+          "Error": "",
+          "IdempotencyKey": "bb06d758-2500-4193-81ca-51fcbf0a51da:validate"
+        }
+      ],
+      "events": [
+        {
+          "RunID": "bb06d758-2500-4193-81ca-51fcbf0a51da",
+          "Seq": 1,
+          "Type": "RUN_CREATED",
+          "TaskName": "",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "seed": 42,
+            "scenario_hash": "3afd1ab3b6ec911b0bb45b0a8543ef2d6ff2988385893d98e6f0232d05dfa75c",
+            "scenario_name": "worker-crash-during-analyze",
+            "workflow_name": "data-pipeline",
+            "definition_hash": "d0c1b1539e630e362b4c1acb18f66e38edd787006e2efc1435bfa3bb17bb2e97",
+            "workflow_version": 1
+          },
+          "OccurredAt": "2026-09-02T23:31:07.078429Z"
+        },
+        {
+          "RunID": "bb06d758-2500-4193-81ca-51fcbf0a51da",
+          "Seq": 2,
+          "Type": "TASK_SCHEDULED",
+          "TaskName": "import",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "attempt": 0,
+            "scheduled_at": "2026-09-02T23:31:07.07842945Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:07.078429Z"
+        },
+        {
+          "RunID": "bb06d758-2500-4193-81ca-51fcbf0a51da",
+          "Seq": 3,
+          "Type": "RUN_QUEUED",
+          "TaskName": "",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "task_count": 4
+          },
+          "OccurredAt": "2026-09-02T23:31:07.078429Z"
+        },
+        {
+          "RunID": "bb06d758-2500-4193-81ca-51fcbf0a51da",
+          "Seq": 4,
+          "Type": "TASK_LEASED",
+          "TaskName": "import",
+          "WorkerID": "6f14b10a-214a-407c-837a-3db87361c4b2",
+          "Payload": {
+            "v": 1,
+            "attempt": 1,
+            "lease_expires_at": "2026-09-02T23:31:09.098040682Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:07.09804Z"
+        },
+        {
+          "RunID": "bb06d758-2500-4193-81ca-51fcbf0a51da",
+          "Seq": 5,
+          "Type": "TASK_STARTED",
+          "TaskName": "import",
+          "WorkerID": "6f14b10a-214a-407c-837a-3db87361c4b2",
+          "Payload": {
+            "v": 1,
+            "attempt": 1,
+            "handler": "import_csv"
+          },
+          "OccurredAt": "2026-09-02T23:31:07.10659Z"
+        },
+        {
+          "RunID": "bb06d758-2500-4193-81ca-51fcbf0a51da",
+          "Seq": 6,
+          "Type": "RUN_STARTED",
+          "TaskName": "",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1
+          },
+          "OccurredAt": "2026-09-02T23:31:07.10659Z"
+        },
+        {
+          "RunID": "bb06d758-2500-4193-81ca-51fcbf0a51da",
+          "Seq": 7,
+          "Type": "TASK_SUCCEEDED",
+          "TaskName": "import",
+          "WorkerID": "6f14b10a-214a-407c-837a-3db87361c4b2",
+          "Payload": {
+            "v": 1,
+            "output": {
+              "rows": 1000
+            },
+            "attempt": 1,
+            "artifacts": [
+              {
+                "name": "imported.csv",
+                "size": 9,
+                "sha256": "6eb31300aed462386f9f52f25d0155b3ca1a9ebce4c811950777282d69a81c64",
+                "content_type": "text/csv"
+              }
+            ],
+            "duration_ms": 0
+          },
+          "OccurredAt": "2026-09-02T23:31:07.110009Z"
+        },
+        {
+          "RunID": "bb06d758-2500-4193-81ca-51fcbf0a51da",
+          "Seq": 8,
+          "Type": "TASK_SCHEDULED",
+          "TaskName": "validate",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "attempt": 0,
+            "depends_on": [
+              "import"
+            ],
+            "scheduled_at": "2026-09-02T23:31:07.110009437Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:07.110009Z"
+        },
+        {
+          "RunID": "bb06d758-2500-4193-81ca-51fcbf0a51da",
+          "Seq": 9,
+          "Type": "TASK_LEASED",
+          "TaskName": "validate",
+          "WorkerID": "423bf373-75eb-4d76-bec4-ddc64f01a5fd",
+          "Payload": {
+            "v": 1,
+            "attempt": 1,
+            "lease_expires_at": "2026-09-02T23:31:09.30115289Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:07.301152Z"
+        },
+        {
+          "RunID": "bb06d758-2500-4193-81ca-51fcbf0a51da",
+          "Seq": 10,
+          "Type": "TASK_STARTED",
+          "TaskName": "validate",
+          "WorkerID": "423bf373-75eb-4d76-bec4-ddc64f01a5fd",
+          "Payload": {
+            "v": 1,
+            "attempt": 1,
+            "handler": "validate_rows"
+          },
+          "OccurredAt": "2026-09-02T23:31:07.311799Z"
+        },
+        {
+          "RunID": "bb06d758-2500-4193-81ca-51fcbf0a51da",
+          "Seq": 11,
+          "Type": "TASK_SUCCEEDED",
+          "TaskName": "validate",
+          "WorkerID": "423bf373-75eb-4d76-bec4-ddc64f01a5fd",
+          "Payload": {
+            "v": 1,
+            "output": {
+              "valid": 994,
+              "invalid": 6
+            },
+            "attempt": 1,
+            "duration_ms": 0
+          },
+          "OccurredAt": "2026-09-02T23:31:07.314923Z"
+        },
+        {
+          "RunID": "bb06d758-2500-4193-81ca-51fcbf0a51da",
+          "Seq": 12,
+          "Type": "TASK_SCHEDULED",
+          "TaskName": "analyze",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "attempt": 0,
+            "depends_on": [
+              "validate"
+            ],
+            "scheduled_at": "2026-09-02T23:31:07.314923929Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:07.314923Z"
+        },
+        {
+          "RunID": "bb06d758-2500-4193-81ca-51fcbf0a51da",
+          "Seq": 13,
+          "Type": "TASK_LEASED",
+          "TaskName": "analyze",
+          "WorkerID": "6f14b10a-214a-407c-837a-3db87361c4b2",
+          "Payload": {
+            "v": 1,
+            "attempt": 1,
+            "lease_expires_at": "2026-09-02T23:31:09.507566948Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:07.507566Z"
+        },
+        {
+          "RunID": "bb06d758-2500-4193-81ca-51fcbf0a51da",
+          "Seq": 14,
+          "Type": "TASK_STARTED",
+          "TaskName": "analyze",
+          "WorkerID": "6f14b10a-214a-407c-837a-3db87361c4b2",
+          "Payload": {
+            "v": 1,
+            "attempt": 1,
+            "handler": "analyze"
+          },
+          "OccurredAt": "2026-09-02T23:31:07.511476Z"
+        },
+        {
+          "RunID": "bb06d758-2500-4193-81ca-51fcbf0a51da",
+          "Seq": 15,
+          "Type": "FAULT_INJECTED",
+          "TaskName": "analyze",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "draw": 0,
+            "seed": 42,
+            "scenario": "worker-crash-during-analyze",
+            "fault_type": "worker-crash",
+            "fault_point": "after-task-start"
+          },
+          "OccurredAt": "2026-09-02T23:31:07.513584Z"
+        },
+        {
+          "RunID": "bb06d758-2500-4193-81ca-51fcbf0a51da",
+          "Seq": 16,
+          "Type": "WORKER_LOST",
+          "TaskName": "",
+          "WorkerID": "6f14b10a-214a-407c-837a-3db87361c4b2",
+          "Payload": {
+            "v": 1,
+            "missed_beats": 5,
+            "leases_released": 1
+          },
+          "OccurredAt": "2026-09-02T23:31:09.086405Z"
+        },
+        {
+          "RunID": "bb06d758-2500-4193-81ca-51fcbf0a51da",
+          "Seq": 17,
+          "Type": "TASK_LEASE_EXPIRED",
+          "TaskName": "analyze",
+          "WorkerID": "6f14b10a-214a-407c-837a-3db87361c4b2",
+          "Payload": {
+            "v": 1,
+            "attempt": 1,
+            "lease_expired_at": "2026-09-02T23:31:09.086405Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:09.285826Z"
+        },
+        {
+          "RunID": "bb06d758-2500-4193-81ca-51fcbf0a51da",
+          "Seq": 18,
+          "Type": "TASK_REQUEUED",
+          "TaskName": "analyze",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "reason": "lease expired",
+            "attempt": 1,
+            "next_attempt": 2
+          },
+          "OccurredAt": "2026-09-02T23:31:09.285826Z"
+        },
+        {
+          "RunID": "bb06d758-2500-4193-81ca-51fcbf0a51da",
+          "Seq": 19,
+          "Type": "TASK_LEASED",
+          "TaskName": "analyze",
+          "WorkerID": "423bf373-75eb-4d76-bec4-ddc64f01a5fd",
+          "Payload": {
+            "v": 1,
+            "attempt": 2,
+            "lease_expires_at": "2026-09-02T23:31:11.32420136Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:09.324201Z"
+        },
+        {
+          "RunID": "bb06d758-2500-4193-81ca-51fcbf0a51da",
+          "Seq": 20,
+          "Type": "TASK_STARTED",
+          "TaskName": "analyze",
+          "WorkerID": "423bf373-75eb-4d76-bec4-ddc64f01a5fd",
+          "Payload": {
+            "v": 1,
+            "attempt": 2,
+            "handler": "analyze"
+          },
+          "OccurredAt": "2026-09-02T23:31:09.327631Z"
+        },
+        {
+          "RunID": "bb06d758-2500-4193-81ca-51fcbf0a51da",
+          "Seq": 21,
+          "Type": "TASK_SUCCEEDED",
+          "TaskName": "analyze",
+          "WorkerID": "423bf373-75eb-4d76-bec4-ddc64f01a5fd",
+          "Payload": {
+            "v": 1,
+            "output": {
+              "mean": 497,
+              "count": 994
+            },
+            "attempt": 2,
+            "artifacts": [
+              {
+                "name": "analysis.json",
+                "size": 24,
+                "sha256": "3a6711131b05a37b630c267665849696566e3b0a7488e5bde0b0f118786ada7d",
+                "content_type": "application/json"
+              }
+            ],
+            "duration_ms": 0
+          },
+          "OccurredAt": "2026-09-02T23:31:09.329378Z"
+        },
+        {
+          "RunID": "bb06d758-2500-4193-81ca-51fcbf0a51da",
+          "Seq": 22,
+          "Type": "TASK_SCHEDULED",
+          "TaskName": "report",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "attempt": 0,
+            "depends_on": [
+              "analyze"
+            ],
+            "scheduled_at": "2026-09-02T23:31:09.329378906Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:09.329378Z"
+        },
+        {
+          "RunID": "bb06d758-2500-4193-81ca-51fcbf0a51da",
+          "Seq": 23,
+          "Type": "TASK_LEASED",
+          "TaskName": "report",
+          "WorkerID": "63a9b177-5d37-4738-85ad-ab5258b08f5b",
+          "Payload": {
+            "v": 1,
+            "attempt": 1,
+            "lease_expires_at": "2026-09-02T23:31:11.348169533Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:09.348169Z"
+        },
+        {
+          "RunID": "bb06d758-2500-4193-81ca-51fcbf0a51da",
+          "Seq": 24,
+          "Type": "TASK_STARTED",
+          "TaskName": "report",
+          "WorkerID": "63a9b177-5d37-4738-85ad-ab5258b08f5b",
+          "Payload": {
+            "v": 1,
+            "attempt": 1,
+            "handler": "generate_report"
+          },
+          "OccurredAt": "2026-09-02T23:31:09.357752Z"
+        },
+        {
+          "RunID": "bb06d758-2500-4193-81ca-51fcbf0a51da",
+          "Seq": 25,
+          "Type": "TASK_SUCCEEDED",
+          "TaskName": "report",
+          "WorkerID": "63a9b177-5d37-4738-85ad-ab5258b08f5b",
+          "Payload": {
+            "v": 1,
+            "output": {
+              "bytes": 26
+            },
+            "attempt": 1,
+            "artifacts": [
+              {
+                "name": "report.txt",
+                "size": 26,
+                "sha256": "0178113cce88afc0b9d891a8762ff3b1f324d67484b30144349884d62353a3cd",
+                "content_type": "text/plain"
+              }
+            ],
+            "duration_ms": 0
+          },
+          "OccurredAt": "2026-09-02T23:31:09.360298Z"
+        },
+        {
+          "RunID": "bb06d758-2500-4193-81ca-51fcbf0a51da",
+          "Seq": 26,
+          "Type": "RUN_SUCCEEDED",
+          "TaskName": "",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "tasks_succeeded": 4
+          },
+          "OccurredAt": "2026-09-02T23:31:09.360298Z"
+        }
+      ]
+    },
+    {
+      "run": {
+        "ID": "c68a432f-a112-40a3-b1af-2433dad7c7f9",
+        "WorkflowID": "1deab810-ef81-4c97-bb92-b558abe9330d",
+        "WorkflowName": "effectful",
+        "WorkflowVer": 1,
+        "Status": "SUCCEEDED",
+        "ScenarioName": "duplicate-delivery-on-charge",
+        "Seed": 31337,
+        "EventSeq": 18,
+        "CorrelationID": "",
+        "FailureReason": "",
+        "CreatedAt": "2026-09-02T23:31:07.015775Z",
+        "StartedAt": "2026-09-02T23:31:07.030696Z",
+        "CompletedAt": "2026-09-02T23:31:07.054474Z"
+      },
+      "tasks": [
+        {
+          "ID": "b81944e7-be80-43a6-aef0-c8a3cd59e687",
+          "RunID": "c68a432f-a112-40a3-b1af-2433dad7c7f9",
+          "Name": "charge",
+          "Attempt": 1,
+          "MaxAttempts": 3,
+          "Status": "SUCCEEDED",
+          "WorkerID": "60026864-76be-404a-9c4b-45f17465da3d",
+          "LeaseExpiresAt": null,
+          "ScheduledAt": "2026-09-02T23:31:07.033676Z",
+          "StartedAt": "2026-09-02T23:31:07.041142Z",
+          "CompletedAt": "2026-09-02T23:31:07.044385Z",
+          "Output": {
+            "effect": {
+              "charged": true,
+              "by_attempt": 1
+            },
+            "attempt": 1
+          },
+          "Error": "",
+          "IdempotencyKey": "c68a432f-a112-40a3-b1af-2433dad7c7f9:charge"
+        },
+        {
+          "ID": "c6d07fa9-40d4-44aa-8482-09ce207c889f",
+          "RunID": "c68a432f-a112-40a3-b1af-2433dad7c7f9",
+          "Name": "import",
+          "Attempt": 1,
+          "MaxAttempts": 3,
+          "Status": "SUCCEEDED",
+          "WorkerID": "60026864-76be-404a-9c4b-45f17465da3d",
+          "LeaseExpiresAt": null,
+          "ScheduledAt": "2026-09-02T23:31:07.015775Z",
+          "StartedAt": "2026-09-02T23:31:07.030696Z",
+          "CompletedAt": "2026-09-02T23:31:07.033676Z",
+          "Output": {
+            "rows": 1000
+          },
+          "Error": "",
+          "IdempotencyKey": "c68a432f-a112-40a3-b1af-2433dad7c7f9:import"
+        },
+        {
+          "ID": "7716be1c-8542-4d71-82fc-e9003f6e6b2a",
+          "RunID": "c68a432f-a112-40a3-b1af-2433dad7c7f9",
+          "Name": "report",
+          "Attempt": 1,
+          "MaxAttempts": 3,
+          "Status": "SUCCEEDED",
+          "WorkerID": "60026864-76be-404a-9c4b-45f17465da3d",
+          "LeaseExpiresAt": null,
+          "ScheduledAt": "2026-09-02T23:31:07.044385Z",
+          "StartedAt": "2026-09-02T23:31:07.052974Z",
+          "CompletedAt": "2026-09-02T23:31:07.054474Z",
+          "Output": {
+            "inputs": 1
+          },
+          "Error": "",
+          "IdempotencyKey": "c68a432f-a112-40a3-b1af-2433dad7c7f9:report"
+        }
+      ],
+      "events": [
+        {
+          "RunID": "c68a432f-a112-40a3-b1af-2433dad7c7f9",
+          "Seq": 1,
+          "Type": "RUN_CREATED",
+          "TaskName": "",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "seed": 31337,
+            "scenario_hash": "a2c02f561704906128efe15f7244add194de6b4efbdefbd29c6c381f63dcd86b",
+            "scenario_name": "duplicate-delivery-on-charge",
+            "workflow_name": "effectful",
+            "definition_hash": "480bc5f1f741608e984104b1b9ef0acf5930a5d6622b750a2df5f1fe2f75c7ee",
+            "workflow_version": 1
+          },
+          "OccurredAt": "2026-09-02T23:31:07.015775Z"
+        },
+        {
+          "RunID": "c68a432f-a112-40a3-b1af-2433dad7c7f9",
+          "Seq": 2,
+          "Type": "TASK_SCHEDULED",
+          "TaskName": "import",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "attempt": 0,
+            "scheduled_at": "2026-09-02T23:31:07.015775166Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:07.015775Z"
+        },
+        {
+          "RunID": "c68a432f-a112-40a3-b1af-2433dad7c7f9",
+          "Seq": 3,
+          "Type": "RUN_QUEUED",
+          "TaskName": "",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "task_count": 3
+          },
+          "OccurredAt": "2026-09-02T23:31:07.015775Z"
+        },
+        {
+          "RunID": "c68a432f-a112-40a3-b1af-2433dad7c7f9",
+          "Seq": 4,
+          "Type": "TASK_LEASED",
+          "TaskName": "import",
+          "WorkerID": "60026864-76be-404a-9c4b-45f17465da3d",
+          "Payload": {
+            "v": 1,
+            "attempt": 1,
+            "lease_expires_at": "2026-09-02T23:31:09.02422958Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:07.024229Z"
+        },
+        {
+          "RunID": "c68a432f-a112-40a3-b1af-2433dad7c7f9",
+          "Seq": 5,
+          "Type": "TASK_STARTED",
+          "TaskName": "import",
+          "WorkerID": "60026864-76be-404a-9c4b-45f17465da3d",
+          "Payload": {
+            "v": 1,
+            "attempt": 1,
+            "handler": "import_csv"
+          },
+          "OccurredAt": "2026-09-02T23:31:07.030696Z"
+        },
+        {
+          "RunID": "c68a432f-a112-40a3-b1af-2433dad7c7f9",
+          "Seq": 6,
+          "Type": "RUN_STARTED",
+          "TaskName": "",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1
+          },
+          "OccurredAt": "2026-09-02T23:31:07.030696Z"
+        },
+        {
+          "RunID": "c68a432f-a112-40a3-b1af-2433dad7c7f9",
+          "Seq": 7,
+          "Type": "TASK_SUCCEEDED",
+          "TaskName": "import",
+          "WorkerID": "60026864-76be-404a-9c4b-45f17465da3d",
+          "Payload": {
+            "v": 1,
+            "output": {
+              "rows": 1000
+            },
+            "attempt": 1,
+            "artifacts": [
+              {
+                "name": "imported.csv",
+                "size": 9,
+                "sha256": "6eb31300aed462386f9f52f25d0155b3ca1a9ebce4c811950777282d69a81c64",
+                "content_type": "text/csv"
+              }
+            ],
+            "duration_ms": 0
+          },
+          "OccurredAt": "2026-09-02T23:31:07.033676Z"
+        },
+        {
+          "RunID": "c68a432f-a112-40a3-b1af-2433dad7c7f9",
+          "Seq": 8,
+          "Type": "TASK_SCHEDULED",
+          "TaskName": "charge",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "attempt": 0,
+            "depends_on": [
+              "import"
+            ],
+            "scheduled_at": "2026-09-02T23:31:07.033676176Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:07.033676Z"
+        },
+        {
+          "RunID": "c68a432f-a112-40a3-b1af-2433dad7c7f9",
+          "Seq": 9,
+          "Type": "TASK_LEASED",
+          "TaskName": "charge",
+          "WorkerID": "60026864-76be-404a-9c4b-45f17465da3d",
+          "Payload": {
+            "v": 1,
+            "attempt": 1,
+            "lease_expires_at": "2026-09-02T23:31:09.038887823Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:07.038887Z"
+        },
+        {
+          "RunID": "c68a432f-a112-40a3-b1af-2433dad7c7f9",
+          "Seq": 10,
+          "Type": "TASK_STARTED",
+          "TaskName": "charge",
+          "WorkerID": "60026864-76be-404a-9c4b-45f17465da3d",
+          "Payload": {
+            "v": 1,
+            "attempt": 1,
+            "handler": "charge_once"
+          },
+          "OccurredAt": "2026-09-02T23:31:07.041142Z"
+        },
+        {
+          "RunID": "c68a432f-a112-40a3-b1af-2433dad7c7f9",
+          "Seq": 11,
+          "Type": "TASK_SUCCEEDED",
+          "TaskName": "charge",
+          "WorkerID": "60026864-76be-404a-9c4b-45f17465da3d",
+          "Payload": {
+            "v": 1,
+            "output": {
+              "effect": {
+                "charged": true,
+                "by_attempt": 1
+              },
+              "attempt": 1
+            },
+            "attempt": 1,
+            "duration_ms": 1
+          },
+          "OccurredAt": "2026-09-02T23:31:07.044385Z"
+        },
+        {
+          "RunID": "c68a432f-a112-40a3-b1af-2433dad7c7f9",
+          "Seq": 12,
+          "Type": "TASK_SCHEDULED",
+          "TaskName": "report",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "attempt": 0,
+            "depends_on": [
+              "charge"
+            ],
+            "scheduled_at": "2026-09-02T23:31:07.044385533Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:07.044385Z"
+        },
+        {
+          "RunID": "c68a432f-a112-40a3-b1af-2433dad7c7f9",
+          "Seq": 13,
+          "Type": "FAULT_INJECTED",
+          "TaskName": "charge",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "draw": 0,
+            "seed": 31337,
+            "scenario": "duplicate-delivery-on-charge",
+            "fault_type": "duplicate-delivery",
+            "fault_point": "after-task-finish"
+          },
+          "OccurredAt": "2026-09-02T23:31:07.047482Z"
+        },
+        {
+          "RunID": "c68a432f-a112-40a3-b1af-2433dad7c7f9",
+          "Seq": 14,
+          "Type": "SIDE_EFFECT_SKIPPED",
+          "TaskName": "charge",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "attempt": 1,
+            "first_attempt": 1,
+            "idempotency_key": "c68a432f-a112-40a3-b1af-2433dad7c7f9:charge:external-charge"
+          },
+          "OccurredAt": "2026-09-02T23:31:07.048618Z"
+        },
+        {
+          "RunID": "c68a432f-a112-40a3-b1af-2433dad7c7f9",
+          "Seq": 15,
+          "Type": "TASK_LEASED",
+          "TaskName": "report",
+          "WorkerID": "60026864-76be-404a-9c4b-45f17465da3d",
+          "Payload": {
+            "v": 1,
+            "attempt": 1,
+            "lease_expires_at": "2026-09-02T23:31:09.050833659Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:07.050833Z"
+        },
+        {
+          "RunID": "c68a432f-a112-40a3-b1af-2433dad7c7f9",
+          "Seq": 16,
+          "Type": "TASK_STARTED",
+          "TaskName": "report",
+          "WorkerID": "60026864-76be-404a-9c4b-45f17465da3d",
+          "Payload": {
+            "v": 1,
+            "attempt": 1,
+            "handler": "summarize"
+          },
+          "OccurredAt": "2026-09-02T23:31:07.052974Z"
+        },
+        {
+          "RunID": "c68a432f-a112-40a3-b1af-2433dad7c7f9",
+          "Seq": 17,
+          "Type": "TASK_SUCCEEDED",
+          "TaskName": "report",
+          "WorkerID": "60026864-76be-404a-9c4b-45f17465da3d",
+          "Payload": {
+            "v": 1,
+            "output": {
+              "inputs": 1
+            },
+            "attempt": 1,
+            "artifacts": [
+              {
+                "name": "summary.json",
+                "size": 65,
+                "sha256": "54cb487a3dd596a1d7337436435d9ff485ee285dc6e727a8eda83ff26eb2bc2b",
+                "content_type": "application/json"
+              }
+            ],
+            "duration_ms": 0
+          },
+          "OccurredAt": "2026-09-02T23:31:07.054474Z"
+        },
+        {
+          "RunID": "c68a432f-a112-40a3-b1af-2433dad7c7f9",
+          "Seq": 18,
+          "Type": "RUN_SUCCEEDED",
+          "TaskName": "",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "tasks_succeeded": 3
+          },
+          "OccurredAt": "2026-09-02T23:31:07.054474Z"
+        }
+      ]
+    },
+    {
+      "run": {
+        "ID": "29780383-a221-4743-8fd1-72660de1e6d5",
+        "WorkflowID": "49bff2e9-d723-4188-934d-18ee82a781a6",
+        "WorkflowName": "data-pipeline",
+        "WorkflowVer": 1,
+        "Status": "FAILED",
+        "ScenarioName": "upstream-down-throughout",
+        "Seed": 7,
+        "EventSeq": 28,
+        "CorrelationID": "",
+        "FailureReason": "3 of 4 tasks did not succeed",
+        "CreatedAt": "2026-09-02T23:31:04.0205Z",
+        "StartedAt": "2026-09-02T23:31:04.036525Z",
+        "CompletedAt": "2026-09-02T23:31:06.990518Z"
+      },
+      "tasks": [
+        {
+          "ID": "7b9d6850-f8a4-46a8-a0a8-7a7c1e935ece",
+          "RunID": "29780383-a221-4743-8fd1-72660de1e6d5",
+          "Name": "analyze",
+          "Attempt": 0,
+          "MaxAttempts": 3,
+          "Status": "DEAD",
+          "WorkerID": null,
+          "LeaseExpiresAt": null,
+          "ScheduledAt": "2026-09-02T23:31:04.0205Z",
+          "StartedAt": null,
+          "CompletedAt": "2026-09-02T23:31:06.990518Z",
+          "Output": null,
+          "Error": "",
+          "IdempotencyKey": "29780383-a221-4743-8fd1-72660de1e6d5:analyze"
+        },
+        {
+          "ID": "da511ab1-5205-4c71-a0d2-88f74f384183",
+          "RunID": "29780383-a221-4743-8fd1-72660de1e6d5",
+          "Name": "import",
+          "Attempt": 1,
+          "MaxAttempts": 3,
+          "Status": "SUCCEEDED",
+          "WorkerID": "db3c6da3-e415-4bab-9cca-4f681543a791",
+          "LeaseExpiresAt": null,
+          "ScheduledAt": "2026-09-02T23:31:04.0205Z",
+          "StartedAt": "2026-09-02T23:31:04.036525Z",
+          "CompletedAt": "2026-09-02T23:31:04.039478Z",
+          "Output": {
+            "rows": 1000
+          },
+          "Error": "",
+          "IdempotencyKey": "29780383-a221-4743-8fd1-72660de1e6d5:import"
+        },
+        {
+          "ID": "46c08ef7-8d82-46c3-ba95-e738886db489",
+          "RunID": "29780383-a221-4743-8fd1-72660de1e6d5",
+          "Name": "report",
+          "Attempt": 0,
+          "MaxAttempts": 3,
+          "Status": "DEAD",
+          "WorkerID": null,
+          "LeaseExpiresAt": null,
+          "ScheduledAt": "2026-09-02T23:31:04.0205Z",
+          "StartedAt": null,
+          "CompletedAt": "2026-09-02T23:31:06.990518Z",
+          "Output": null,
+          "Error": "",
+          "IdempotencyKey": "29780383-a221-4743-8fd1-72660de1e6d5:report"
+        },
+        {
+          "ID": "d704ffaa-094d-4087-a7e3-67286e953cbe",
+          "RunID": "29780383-a221-4743-8fd1-72660de1e6d5",
+          "Name": "validate",
+          "Attempt": 3,
+          "MaxAttempts": 3,
+          "Status": "DEAD",
+          "WorkerID": null,
+          "LeaseExpiresAt": null,
+          "ScheduledAt": "2026-09-02T23:31:06.967797Z",
+          "StartedAt": "2026-09-02T23:31:04.047864Z",
+          "CompletedAt": "2026-09-02T23:31:06.990518Z",
+          "Output": null,
+          "Error": "injected http-error fault: upstream returned 503",
+          "IdempotencyKey": "29780383-a221-4743-8fd1-72660de1e6d5:validate"
+        }
+      ],
+      "events": [
+        {
+          "RunID": "29780383-a221-4743-8fd1-72660de1e6d5",
+          "Seq": 1,
+          "Type": "RUN_CREATED",
+          "TaskName": "",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "seed": 7,
+            "scenario_hash": "2c06a5fafde1e39af9e65c579ccbdbf08679be67e2d91b5d14dd2983bb0e231d",
+            "scenario_name": "upstream-down-throughout",
+            "workflow_name": "data-pipeline",
+            "definition_hash": "d0c1b1539e630e362b4c1acb18f66e38edd787006e2efc1435bfa3bb17bb2e97",
+            "workflow_version": 1
+          },
+          "OccurredAt": "2026-09-02T23:31:04.0205Z"
+        },
+        {
+          "RunID": "29780383-a221-4743-8fd1-72660de1e6d5",
+          "Seq": 2,
+          "Type": "TASK_SCHEDULED",
+          "TaskName": "import",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "attempt": 0,
+            "scheduled_at": "2026-09-02T23:31:04.020500779Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:04.0205Z"
+        },
+        {
+          "RunID": "29780383-a221-4743-8fd1-72660de1e6d5",
+          "Seq": 3,
+          "Type": "RUN_QUEUED",
+          "TaskName": "",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "task_count": 4
+          },
+          "OccurredAt": "2026-09-02T23:31:04.0205Z"
+        },
+        {
+          "RunID": "29780383-a221-4743-8fd1-72660de1e6d5",
+          "Seq": 4,
+          "Type": "TASK_LEASED",
+          "TaskName": "import",
+          "WorkerID": "db3c6da3-e415-4bab-9cca-4f681543a791",
+          "Payload": {
+            "v": 1,
+            "attempt": 1,
+            "lease_expires_at": "2026-09-02T23:31:34.028667542Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:04.028667Z"
+        },
+        {
+          "RunID": "29780383-a221-4743-8fd1-72660de1e6d5",
+          "Seq": 5,
+          "Type": "TASK_STARTED",
+          "TaskName": "import",
+          "WorkerID": "db3c6da3-e415-4bab-9cca-4f681543a791",
+          "Payload": {
+            "v": 1,
+            "attempt": 1,
+            "handler": "import_csv"
+          },
+          "OccurredAt": "2026-09-02T23:31:04.036525Z"
+        },
+        {
+          "RunID": "29780383-a221-4743-8fd1-72660de1e6d5",
+          "Seq": 6,
+          "Type": "RUN_STARTED",
+          "TaskName": "",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1
+          },
+          "OccurredAt": "2026-09-02T23:31:04.036525Z"
+        },
+        {
+          "RunID": "29780383-a221-4743-8fd1-72660de1e6d5",
+          "Seq": 7,
+          "Type": "TASK_SUCCEEDED",
+          "TaskName": "import",
+          "WorkerID": "db3c6da3-e415-4bab-9cca-4f681543a791",
+          "Payload": {
+            "v": 1,
+            "output": {
+              "rows": 1000
+            },
+            "attempt": 1,
+            "artifacts": [
+              {
+                "name": "imported.csv",
+                "size": 9,
+                "sha256": "6eb31300aed462386f9f52f25d0155b3ca1a9ebce4c811950777282d69a81c64",
+                "content_type": "text/csv"
+              }
+            ],
+            "duration_ms": 0
+          },
+          "OccurredAt": "2026-09-02T23:31:04.039478Z"
+        },
+        {
+          "RunID": "29780383-a221-4743-8fd1-72660de1e6d5",
+          "Seq": 8,
+          "Type": "TASK_SCHEDULED",
+          "TaskName": "validate",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "attempt": 0,
+            "depends_on": [
+              "import"
+            ],
+            "scheduled_at": "2026-09-02T23:31:04.039478796Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:04.039478Z"
+        },
+        {
+          "RunID": "29780383-a221-4743-8fd1-72660de1e6d5",
+          "Seq": 9,
+          "Type": "TASK_LEASED",
+          "TaskName": "validate",
+          "WorkerID": "db3c6da3-e415-4bab-9cca-4f681543a791",
+          "Payload": {
+            "v": 1,
+            "attempt": 1,
+            "lease_expires_at": "2026-09-02T23:31:34.044949701Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:04.044949Z"
+        },
+        {
+          "RunID": "29780383-a221-4743-8fd1-72660de1e6d5",
+          "Seq": 10,
+          "Type": "TASK_STARTED",
+          "TaskName": "validate",
+          "WorkerID": "db3c6da3-e415-4bab-9cca-4f681543a791",
+          "Payload": {
+            "v": 1,
+            "attempt": 1,
+            "handler": "validate_rows"
+          },
+          "OccurredAt": "2026-09-02T23:31:04.047864Z"
+        },
+        {
+          "RunID": "29780383-a221-4743-8fd1-72660de1e6d5",
+          "Seq": 11,
+          "Type": "FAULT_INJECTED",
+          "TaskName": "validate",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "draw": 0,
+            "seed": 7,
+            "params": {
+              "status": 503
+            },
+            "scenario": "upstream-down-throughout",
+            "fault_type": "http-error",
+            "fault_point": "after-task-start"
+          },
+          "OccurredAt": "2026-09-02T23:31:04.049284Z"
+        },
+        {
+          "RunID": "29780383-a221-4743-8fd1-72660de1e6d5",
+          "Seq": 12,
+          "Type": "TASK_FAILED",
+          "TaskName": "validate",
+          "WorkerID": "db3c6da3-e415-4bab-9cca-4f681543a791",
+          "Payload": {
+            "v": 1,
+            "error": "injected http-error fault: upstream returned 503",
+            "attempt": 1,
+            "retryable": true,
+            "duration_ms": 0
+          },
+          "OccurredAt": "2026-09-02T23:31:04.050011Z"
+        },
+        {
+          "RunID": "29780383-a221-4743-8fd1-72660de1e6d5",
+          "Seq": 13,
+          "Type": "TASK_RETRY_SCHEDULED",
+          "TaskName": "validate",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "run_at": "2026-09-02T23:31:04.866937481Z",
+            "attempt": 1,
+            "delay_ms": 816,
+            "next_attempt": 2
+          },
+          "OccurredAt": "2026-09-02T23:31:04.050011Z"
+        },
+        {
+          "RunID": "29780383-a221-4743-8fd1-72660de1e6d5",
+          "Seq": 14,
+          "Type": "TASK_SCHEDULED",
+          "TaskName": "validate",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "attempt": 1,
+            "scheduled_at": "2026-09-02T23:31:04.888795832Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:04.888795Z"
+        },
+        {
+          "RunID": "29780383-a221-4743-8fd1-72660de1e6d5",
+          "Seq": 15,
+          "Type": "TASK_LEASED",
+          "TaskName": "validate",
+          "WorkerID": "db3c6da3-e415-4bab-9cca-4f681543a791",
+          "Payload": {
+            "v": 1,
+            "attempt": 2,
+            "lease_expires_at": "2026-09-02T23:31:34.890548215Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:04.890548Z"
+        },
+        {
+          "RunID": "29780383-a221-4743-8fd1-72660de1e6d5",
+          "Seq": 16,
+          "Type": "TASK_STARTED",
+          "TaskName": "validate",
+          "WorkerID": "db3c6da3-e415-4bab-9cca-4f681543a791",
+          "Payload": {
+            "v": 1,
+            "attempt": 2,
+            "handler": "validate_rows"
+          },
+          "OccurredAt": "2026-09-02T23:31:04.893384Z"
+        },
+        {
+          "RunID": "29780383-a221-4743-8fd1-72660de1e6d5",
+          "Seq": 17,
+          "Type": "FAULT_INJECTED",
+          "TaskName": "validate",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "draw": 0,
+            "seed": 7,
+            "params": {
+              "status": 503
+            },
+            "scenario": "upstream-down-throughout",
+            "fault_type": "http-error",
+            "fault_point": "after-task-start"
+          },
+          "OccurredAt": "2026-09-02T23:31:04.895061Z"
+        },
+        {
+          "RunID": "29780383-a221-4743-8fd1-72660de1e6d5",
+          "Seq": 18,
+          "Type": "TASK_FAILED",
+          "TaskName": "validate",
+          "WorkerID": "db3c6da3-e415-4bab-9cca-4f681543a791",
+          "Payload": {
+            "v": 1,
+            "error": "injected http-error fault: upstream returned 503",
+            "attempt": 2,
+            "retryable": true,
+            "duration_ms": 0
+          },
+          "OccurredAt": "2026-09-02T23:31:04.896821Z"
+        },
+        {
+          "RunID": "29780383-a221-4743-8fd1-72660de1e6d5",
+          "Seq": 19,
+          "Type": "TASK_RETRY_SCHEDULED",
+          "TaskName": "validate",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "run_at": "2026-09-02T23:31:06.967797438Z",
+            "attempt": 2,
+            "delay_ms": 2070,
+            "next_attempt": 3
+          },
+          "OccurredAt": "2026-09-02T23:31:04.896821Z"
+        },
+        {
+          "RunID": "29780383-a221-4743-8fd1-72660de1e6d5",
+          "Seq": 20,
+          "Type": "TASK_SCHEDULED",
+          "TaskName": "validate",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "attempt": 2,
+            "scheduled_at": "2026-09-02T23:31:06.981373147Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:06.981373Z"
+        },
+        {
+          "RunID": "29780383-a221-4743-8fd1-72660de1e6d5",
+          "Seq": 21,
+          "Type": "TASK_LEASED",
+          "TaskName": "validate",
+          "WorkerID": "db3c6da3-e415-4bab-9cca-4f681543a791",
+          "Payload": {
+            "v": 1,
+            "attempt": 3,
+            "lease_expires_at": "2026-09-02T23:31:36.98300296Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:06.983002Z"
+        },
+        {
+          "RunID": "29780383-a221-4743-8fd1-72660de1e6d5",
+          "Seq": 22,
+          "Type": "TASK_STARTED",
+          "TaskName": "validate",
+          "WorkerID": "db3c6da3-e415-4bab-9cca-4f681543a791",
+          "Payload": {
+            "v": 1,
+            "attempt": 3,
+            "handler": "validate_rows"
+          },
+          "OccurredAt": "2026-09-02T23:31:06.987892Z"
+        },
+        {
+          "RunID": "29780383-a221-4743-8fd1-72660de1e6d5",
+          "Seq": 23,
+          "Type": "FAULT_INJECTED",
+          "TaskName": "validate",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "draw": 0,
+            "seed": 7,
+            "params": {
+              "status": 503
+            },
+            "scenario": "upstream-down-throughout",
+            "fault_type": "http-error",
+            "fault_point": "after-task-start"
+          },
+          "OccurredAt": "2026-09-02T23:31:06.989598Z"
+        },
+        {
+          "RunID": "29780383-a221-4743-8fd1-72660de1e6d5",
+          "Seq": 24,
+          "Type": "TASK_FAILED",
+          "TaskName": "validate",
+          "WorkerID": "db3c6da3-e415-4bab-9cca-4f681543a791",
+          "Payload": {
+            "v": 1,
+            "error": "injected http-error fault: upstream returned 503",
+            "attempt": 3,
+            "retryable": false,
+            "duration_ms": 0
+          },
+          "OccurredAt": "2026-09-02T23:31:06.990518Z"
+        },
+        {
+          "RunID": "29780383-a221-4743-8fd1-72660de1e6d5",
+          "Seq": 25,
+          "Type": "TASK_DEAD_LETTERED",
+          "TaskName": "validate",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "reason": "attempts exhausted: injected http-error fault: upstream returned 503",
+            "attempts": 3
+          },
+          "OccurredAt": "2026-09-02T23:31:06.990518Z"
+        },
+        {
+          "RunID": "29780383-a221-4743-8fd1-72660de1e6d5",
+          "Seq": 26,
+          "Type": "TASK_DEAD_LETTERED",
+          "TaskName": "analyze",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "reason": "upstream task validate did not succeed: ",
+            "attempts": 0
+          },
+          "OccurredAt": "2026-09-02T23:31:06.990518Z"
+        },
+        {
+          "RunID": "29780383-a221-4743-8fd1-72660de1e6d5",
+          "Seq": 27,
+          "Type": "TASK_DEAD_LETTERED",
+          "TaskName": "report",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "reason": "upstream task validate did not succeed: ",
+            "attempts": 0
+          },
+          "OccurredAt": "2026-09-02T23:31:06.990518Z"
+        },
+        {
+          "RunID": "29780383-a221-4743-8fd1-72660de1e6d5",
+          "Seq": 28,
+          "Type": "RUN_FAILED",
+          "TaskName": "",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "detail": "3 of 4 tasks did not succeed",
+            "reason": "tasks dead-lettered"
+          },
+          "OccurredAt": "2026-09-02T23:31:06.990518Z"
+        }
+      ]
+    },
+    {
+      "run": {
+        "ID": "e1a8ee6c-5bb4-442a-8570-5aceb2ce1065",
+        "WorkflowID": "49bff2e9-d723-4188-934d-18ee82a781a6",
+        "WorkflowName": "data-pipeline",
+        "WorkflowVer": 1,
+        "Status": "SUCCEEDED",
+        "ScenarioName": "",
+        "Seed": 3024093237604488113,
+        "EventSeq": 20,
+        "CorrelationID": "",
+        "FailureReason": "",
+        "CreatedAt": "2026-09-02T23:31:03.950342Z",
+        "StartedAt": "2026-09-02T23:31:03.966637Z",
+        "CompletedAt": "2026-09-02T23:31:03.997252Z"
+      },
+      "tasks": [
+        {
+          "ID": "1508bc08-954d-4c45-b462-5b1f4ba208b2",
+          "RunID": "e1a8ee6c-5bb4-442a-8570-5aceb2ce1065",
+          "Name": "analyze",
+          "Attempt": 1,
+          "MaxAttempts": 3,
+          "Status": "SUCCEEDED",
+          "WorkerID": "45cf93e9-d37c-4e2a-bb12-e45538a98745",
+          "LeaseExpiresAt": null,
+          "ScheduledAt": "2026-09-02T23:31:03.980691Z",
+          "StartedAt": "2026-09-02T23:31:03.987255Z",
+          "CompletedAt": "2026-09-02T23:31:03.988825Z",
+          "Output": {
+            "mean": 497,
+            "count": 994
+          },
+          "Error": "",
+          "IdempotencyKey": "e1a8ee6c-5bb4-442a-8570-5aceb2ce1065:analyze"
+        },
+        {
+          "ID": "286c247b-48ca-46fb-a8d2-57ea70322337",
+          "RunID": "e1a8ee6c-5bb4-442a-8570-5aceb2ce1065",
+          "Name": "import",
+          "Attempt": 1,
+          "MaxAttempts": 3,
+          "Status": "SUCCEEDED",
+          "WorkerID": "45cf93e9-d37c-4e2a-bb12-e45538a98745",
+          "LeaseExpiresAt": null,
+          "ScheduledAt": "2026-09-02T23:31:03.950342Z",
+          "StartedAt": "2026-09-02T23:31:03.966637Z",
+          "CompletedAt": "2026-09-02T23:31:03.970614Z",
+          "Output": {
+            "rows": 1000
+          },
+          "Error": "",
+          "IdempotencyKey": "e1a8ee6c-5bb4-442a-8570-5aceb2ce1065:import"
+        },
+        {
+          "ID": "a5e82433-adcb-402f-9c18-5152fce76ccd",
+          "RunID": "e1a8ee6c-5bb4-442a-8570-5aceb2ce1065",
+          "Name": "report",
+          "Attempt": 1,
+          "MaxAttempts": 3,
+          "Status": "SUCCEEDED",
+          "WorkerID": "45cf93e9-d37c-4e2a-bb12-e45538a98745",
+          "LeaseExpiresAt": null,
+          "ScheduledAt": "2026-09-02T23:31:03.988825Z",
+          "StartedAt": "2026-09-02T23:31:03.995444Z",
+          "CompletedAt": "2026-09-02T23:31:03.997252Z",
+          "Output": {
+            "bytes": 26
+          },
+          "Error": "",
+          "IdempotencyKey": "e1a8ee6c-5bb4-442a-8570-5aceb2ce1065:report"
+        },
+        {
+          "ID": "796ef0fc-9e54-4e03-bb74-bce78942908a",
+          "RunID": "e1a8ee6c-5bb4-442a-8570-5aceb2ce1065",
+          "Name": "validate",
+          "Attempt": 1,
+          "MaxAttempts": 3,
+          "Status": "SUCCEEDED",
+          "WorkerID": "45cf93e9-d37c-4e2a-bb12-e45538a98745",
+          "LeaseExpiresAt": null,
+          "ScheduledAt": "2026-09-02T23:31:03.970614Z",
+          "StartedAt": "2026-09-02T23:31:03.978675Z",
+          "CompletedAt": "2026-09-02T23:31:03.980691Z",
+          "Output": {
+            "valid": 994,
+            "invalid": 6
+          },
+          "Error": "",
+          "IdempotencyKey": "e1a8ee6c-5bb4-442a-8570-5aceb2ce1065:validate"
+        }
+      ],
+      "events": [
+        {
+          "RunID": "e1a8ee6c-5bb4-442a-8570-5aceb2ce1065",
+          "Seq": 1,
+          "Type": "RUN_CREATED",
+          "TaskName": "",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "seed": 3024093237604488113,
+            "workflow_name": "data-pipeline",
+            "definition_hash": "d0c1b1539e630e362b4c1acb18f66e38edd787006e2efc1435bfa3bb17bb2e97",
+            "workflow_version": 1
+          },
+          "OccurredAt": "2026-09-02T23:31:03.950342Z"
+        },
+        {
+          "RunID": "e1a8ee6c-5bb4-442a-8570-5aceb2ce1065",
+          "Seq": 2,
+          "Type": "TASK_SCHEDULED",
+          "TaskName": "import",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "attempt": 0,
+            "scheduled_at": "2026-09-02T23:31:03.950342999Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:03.950342Z"
+        },
+        {
+          "RunID": "e1a8ee6c-5bb4-442a-8570-5aceb2ce1065",
+          "Seq": 3,
+          "Type": "RUN_QUEUED",
+          "TaskName": "",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "task_count": 4
+          },
+          "OccurredAt": "2026-09-02T23:31:03.950342Z"
+        },
+        {
+          "RunID": "e1a8ee6c-5bb4-442a-8570-5aceb2ce1065",
+          "Seq": 4,
+          "Type": "TASK_LEASED",
+          "TaskName": "import",
+          "WorkerID": "45cf93e9-d37c-4e2a-bb12-e45538a98745",
+          "Payload": {
+            "v": 1,
+            "attempt": 1,
+            "lease_expires_at": "2026-09-02T23:31:33.959490742Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:03.95949Z"
+        },
+        {
+          "RunID": "e1a8ee6c-5bb4-442a-8570-5aceb2ce1065",
+          "Seq": 5,
+          "Type": "TASK_STARTED",
+          "TaskName": "import",
+          "WorkerID": "45cf93e9-d37c-4e2a-bb12-e45538a98745",
+          "Payload": {
+            "v": 1,
+            "attempt": 1,
+            "handler": "import_csv"
+          },
+          "OccurredAt": "2026-09-02T23:31:03.966637Z"
+        },
+        {
+          "RunID": "e1a8ee6c-5bb4-442a-8570-5aceb2ce1065",
+          "Seq": 6,
+          "Type": "RUN_STARTED",
+          "TaskName": "",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1
+          },
+          "OccurredAt": "2026-09-02T23:31:03.966637Z"
+        },
+        {
+          "RunID": "e1a8ee6c-5bb4-442a-8570-5aceb2ce1065",
+          "Seq": 7,
+          "Type": "TASK_SUCCEEDED",
+          "TaskName": "import",
+          "WorkerID": "45cf93e9-d37c-4e2a-bb12-e45538a98745",
+          "Payload": {
+            "v": 1,
+            "output": {
+              "rows": 1000
+            },
+            "attempt": 1,
+            "artifacts": [
+              {
+                "name": "imported.csv",
+                "size": 9,
+                "sha256": "6eb31300aed462386f9f52f25d0155b3ca1a9ebce4c811950777282d69a81c64",
+                "content_type": "text/csv"
+              }
+            ],
+            "duration_ms": 0
+          },
+          "OccurredAt": "2026-09-02T23:31:03.970614Z"
+        },
+        {
+          "RunID": "e1a8ee6c-5bb4-442a-8570-5aceb2ce1065",
+          "Seq": 8,
+          "Type": "TASK_SCHEDULED",
+          "TaskName": "validate",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "attempt": 0,
+            "depends_on": [
+              "import"
+            ],
+            "scheduled_at": "2026-09-02T23:31:03.97061459Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:03.970614Z"
+        },
+        {
+          "RunID": "e1a8ee6c-5bb4-442a-8570-5aceb2ce1065",
+          "Seq": 9,
+          "Type": "TASK_LEASED",
+          "TaskName": "validate",
+          "WorkerID": "45cf93e9-d37c-4e2a-bb12-e45538a98745",
+          "Payload": {
+            "v": 1,
+            "attempt": 1,
+            "lease_expires_at": "2026-09-02T23:31:33.975859719Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:03.975859Z"
+        },
+        {
+          "RunID": "e1a8ee6c-5bb4-442a-8570-5aceb2ce1065",
+          "Seq": 10,
+          "Type": "TASK_STARTED",
+          "TaskName": "validate",
+          "WorkerID": "45cf93e9-d37c-4e2a-bb12-e45538a98745",
+          "Payload": {
+            "v": 1,
+            "attempt": 1,
+            "handler": "validate_rows"
+          },
+          "OccurredAt": "2026-09-02T23:31:03.978675Z"
+        },
+        {
+          "RunID": "e1a8ee6c-5bb4-442a-8570-5aceb2ce1065",
+          "Seq": 11,
+          "Type": "TASK_SUCCEEDED",
+          "TaskName": "validate",
+          "WorkerID": "45cf93e9-d37c-4e2a-bb12-e45538a98745",
+          "Payload": {
+            "v": 1,
+            "output": {
+              "valid": 994,
+              "invalid": 6
+            },
+            "attempt": 1,
+            "duration_ms": 0
+          },
+          "OccurredAt": "2026-09-02T23:31:03.980691Z"
+        },
+        {
+          "RunID": "e1a8ee6c-5bb4-442a-8570-5aceb2ce1065",
+          "Seq": 12,
+          "Type": "TASK_SCHEDULED",
+          "TaskName": "analyze",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "attempt": 0,
+            "depends_on": [
+              "validate"
+            ],
+            "scheduled_at": "2026-09-02T23:31:03.980691259Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:03.980691Z"
+        },
+        {
+          "RunID": "e1a8ee6c-5bb4-442a-8570-5aceb2ce1065",
+          "Seq": 13,
+          "Type": "TASK_LEASED",
+          "TaskName": "analyze",
+          "WorkerID": "45cf93e9-d37c-4e2a-bb12-e45538a98745",
+          "Payload": {
+            "v": 1,
+            "attempt": 1,
+            "lease_expires_at": "2026-09-02T23:31:33.984276147Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:03.984276Z"
+        },
+        {
+          "RunID": "e1a8ee6c-5bb4-442a-8570-5aceb2ce1065",
+          "Seq": 14,
+          "Type": "TASK_STARTED",
+          "TaskName": "analyze",
+          "WorkerID": "45cf93e9-d37c-4e2a-bb12-e45538a98745",
+          "Payload": {
+            "v": 1,
+            "attempt": 1,
+            "handler": "analyze"
+          },
+          "OccurredAt": "2026-09-02T23:31:03.987255Z"
+        },
+        {
+          "RunID": "e1a8ee6c-5bb4-442a-8570-5aceb2ce1065",
+          "Seq": 15,
+          "Type": "TASK_SUCCEEDED",
+          "TaskName": "analyze",
+          "WorkerID": "45cf93e9-d37c-4e2a-bb12-e45538a98745",
+          "Payload": {
+            "v": 1,
+            "output": {
+              "mean": 497,
+              "count": 994
+            },
+            "attempt": 1,
+            "artifacts": [
+              {
+                "name": "analysis.json",
+                "size": 24,
+                "sha256": "3a6711131b05a37b630c267665849696566e3b0a7488e5bde0b0f118786ada7d",
+                "content_type": "application/json"
+              }
+            ],
+            "duration_ms": 0
+          },
+          "OccurredAt": "2026-09-02T23:31:03.988825Z"
+        },
+        {
+          "RunID": "e1a8ee6c-5bb4-442a-8570-5aceb2ce1065",
+          "Seq": 16,
+          "Type": "TASK_SCHEDULED",
+          "TaskName": "report",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "attempt": 0,
+            "depends_on": [
+              "analyze"
+            ],
+            "scheduled_at": "2026-09-02T23:31:03.988825514Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:03.988825Z"
+        },
+        {
+          "RunID": "e1a8ee6c-5bb4-442a-8570-5aceb2ce1065",
+          "Seq": 17,
+          "Type": "TASK_LEASED",
+          "TaskName": "report",
+          "WorkerID": "45cf93e9-d37c-4e2a-bb12-e45538a98745",
+          "Payload": {
+            "v": 1,
+            "attempt": 1,
+            "lease_expires_at": "2026-09-02T23:31:33.992839772Z"
+          },
+          "OccurredAt": "2026-09-02T23:31:03.992839Z"
+        },
+        {
+          "RunID": "e1a8ee6c-5bb4-442a-8570-5aceb2ce1065",
+          "Seq": 18,
+          "Type": "TASK_STARTED",
+          "TaskName": "report",
+          "WorkerID": "45cf93e9-d37c-4e2a-bb12-e45538a98745",
+          "Payload": {
+            "v": 1,
+            "attempt": 1,
+            "handler": "generate_report"
+          },
+          "OccurredAt": "2026-09-02T23:31:03.995444Z"
+        },
+        {
+          "RunID": "e1a8ee6c-5bb4-442a-8570-5aceb2ce1065",
+          "Seq": 19,
+          "Type": "TASK_SUCCEEDED",
+          "TaskName": "report",
+          "WorkerID": "45cf93e9-d37c-4e2a-bb12-e45538a98745",
+          "Payload": {
+            "v": 1,
+            "output": {
+              "bytes": 26
+            },
+            "attempt": 1,
+            "artifacts": [
+              {
+                "name": "report.txt",
+                "size": 26,
+                "sha256": "0178113cce88afc0b9d891a8762ff3b1f324d67484b30144349884d62353a3cd",
+                "content_type": "text/plain"
+              }
+            ],
+            "duration_ms": 0
+          },
+          "OccurredAt": "2026-09-02T23:31:03.997252Z"
+        },
+        {
+          "RunID": "e1a8ee6c-5bb4-442a-8570-5aceb2ce1065",
+          "Seq": 20,
+          "Type": "RUN_SUCCEEDED",
+          "TaskName": "",
+          "WorkerID": null,
+          "Payload": {
+            "v": 1,
+            "tasks_succeeded": 4
+          },
+          "OccurredAt": "2026-09-02T23:31:03.997252Z"
+        }
+      ]
+    }
+  ],
+  "workers": [
+    {
+      "ID": "611a59e4-70e0-4980-a80c-c4e4373cb4b4",
+      "Hostname": "vm",
+      "Version": "241c136-dirty",
+      "Status": "STOPPED",
+      "Capacity": 1,
+      "ActiveTasks": 0,
+      "LastHeartbeat": "2026-09-02T23:31:11.232058Z",
+      "RegisteredAt": "2026-09-02T23:31:09.429812Z"
+    },
+    {
+      "ID": "305c1862-7cf6-4fc1-904e-78c187ce1342",
+      "Hostname": "vm",
+      "Version": "241c136-dirty",
+      "Status": "STOPPED",
+      "Capacity": 1,
+      "ActiveTasks": 0,
+      "LastHeartbeat": "2026-09-02T23:31:11.068423Z",
+      "RegisteredAt": "2026-09-02T23:31:09.866836Z"
+    },
+    {
+      "ID": "ec633076-8f0b-400c-b7e8-dc38b38bb823",
+      "Hostname": "vm",
+      "Version": "241c136-dirty",
+      "Status": "LOST",
+      "Capacity": 1,
+      "ActiveTasks": 0,
+      "LastHeartbeat": "2026-09-02T23:31:09.430772Z",
+      "RegisteredAt": "2026-09-02T23:31:09.430772Z"
+    },
+    {
+      "ID": "63a9b177-5d37-4738-85ad-ab5258b08f5b",
+      "Hostname": "vm",
+      "Version": "241c136-dirty",
+      "Status": "STOPPED",
+      "Capacity": 1,
+      "ActiveTasks": 0,
+      "LastHeartbeat": "2026-09-02T23:31:09.23354Z",
+      "RegisteredAt": "2026-09-02T23:31:07.731933Z"
+    },
+    {
+      "ID": "423bf373-75eb-4d76-bec4-ddc64f01a5fd",
+      "Hostname": "vm",
+      "Version": "241c136-dirty",
+      "Status": "STOPPED",
+      "Capacity": 1,
+      "ActiveTasks": 0,
+      "LastHeartbeat": "2026-09-02T23:31:09.199688Z",
+      "RegisteredAt": "2026-09-02T23:31:07.097716Z"
+    },
+    {
+      "ID": "6f14b10a-214a-407c-837a-3db87361c4b2",
+      "Hostname": "vm",
+      "Version": "241c136-dirty",
+      "Status": "LOST",
+      "Capacity": 1,
+      "ActiveTasks": 0,
+      "LastHeartbeat": "2026-09-02T23:31:07.398521Z",
+      "RegisteredAt": "2026-09-02T23:31:07.096639Z"
+    },
+    {
+      "ID": "60026864-76be-404a-9c4b-45f17465da3d",
+      "Hostname": "in-process",
+      "Version": "local",
+      "Status": "STOPPED",
+      "Capacity": 1,
+      "ActiveTasks": 0,
+      "LastHeartbeat": "2026-09-02T23:31:07.021517Z",
+      "RegisteredAt": "2026-09-02T23:31:07.021517Z"
+    },
+    {
+      "ID": "db3c6da3-e415-4bab-9cca-4f681543a791",
+      "Hostname": "in-process",
+      "Version": "local",
+      "Status": "STOPPED",
+      "Capacity": 1,
+      "ActiveTasks": 0,
+      "LastHeartbeat": "2026-09-02T23:31:04.026456Z",
+      "RegisteredAt": "2026-09-02T23:31:04.026456Z"
+    },
+    {
+      "ID": "45cf93e9-d37c-4e2a-bb12-e45538a98745",
+      "Hostname": "in-process",
+      "Version": "local",
+      "Status": "STOPPED",
+      "Capacity": 1,
+      "ActiveTasks": 0,
+      "LastHeartbeat": "2026-09-02T23:31:03.956851Z",
+      "RegisteredAt": "2026-09-02T23:31:03.956851Z"
+    }
+  ],
+  "stats": {
+    "runs_by_status": {
+      "FAILED": 1,
+      "SUCCEEDED": 4
+    },
+    "tasks_by_status": {
+      "DEAD": 3,
+      "SUCCEEDED": 15
+    },
+    "workers_by_status": {
+      "LOST": 2,
+      "STOPPED": 7
+    },
+    "queue_depth": 0,
+    "dead_letters": 3
+  }
+}
