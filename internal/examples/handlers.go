@@ -32,6 +32,7 @@ func Register(reg *sdk.Registry) error {
 		"slow_step":       slowStep,
 		"summarize":       summarize,
 		"effect_then_die": effectThenDie,
+		"charge_once":     chargeOnce,
 	}
 	for name, h := range handlers {
 		if err := reg.Handle(name, h); err != nil {
@@ -77,6 +78,22 @@ func slowStep(ctx context.Context, tc *sdk.TaskContext) (any, error) {
 	case <-timer.C:
 	}
 	return map[string]any{"slept_ms": d.Milliseconds(), "attempt": tc.Attempt}, nil
+}
+
+// chargeOnce performs one recorded external effect and reports which attempt
+// performed it.
+//
+// Everything with an outside effect goes through Do, which is the only thing
+// that makes a repeat safe. A handler that called the same API directly would
+// charge twice on a duplicate delivery, and ReLab could not tell.
+func chargeOnce(ctx context.Context, tc *sdk.TaskContext) (any, error) {
+	result, err := tc.Do(ctx, "external-charge", func(context.Context) (any, error) {
+		return map[string]any{"charged": true, "by_attempt": tc.Attempt}, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"effect": result, "attempt": tc.Attempt}, nil
 }
 
 // effectThenDie performs one recorded side effect and then kills its own

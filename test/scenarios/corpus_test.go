@@ -31,7 +31,14 @@ var timingEnv = []string{
 	"RELAB_LOG_LEVEL=error",
 }
 
-const workflowFile = "../../examples/data-pipeline.yaml"
+// defaultWorkflow is used by a scenario that does not name one. Most scenarios
+// exercise the shipped pipeline; a scenario targeting a task only some other
+// workflow has says so with `workflow:`.
+const defaultWorkflow = "examples/data-pipeline.yaml"
+
+// repoRoot is where paths in a scenario's `workflow:` field are resolved from,
+// so the field reads the same in a scenario file as it does on a command line.
+const repoRoot = "../.."
 
 func TestScenarioCorpus(t *testing.T) {
 	if testing.Short() {
@@ -64,7 +71,12 @@ func TestScenarioCorpus(t *testing.T) {
 					"or fails by luck is not a regression test", scenario.Name)
 			}
 
-			report := runScenario(t, binary, dsn, file)
+			workflowFile := filepath.Join(repoRoot, defaultWorkflow)
+			if scenario.Workflow != "" {
+				workflowFile = filepath.Join(repoRoot, scenario.Workflow)
+			}
+
+			report := runScenario(t, binary, dsn, file, workflowFile)
 			if !report.Passed {
 				t.Fatalf("scenario %s failed its assertions: %+v", report.Scenario, report.Results)
 			}
@@ -95,7 +107,7 @@ type report struct {
 	} `json:"results"`
 }
 
-func runScenario(t *testing.T, binary, dsn, scenarioFile string) report {
+func runScenario(t *testing.T, binary, dsn, scenarioFile, workflowFile string) report {
 	t.Helper()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)

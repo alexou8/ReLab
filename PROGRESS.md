@@ -123,7 +123,7 @@ than a panic or a plausible-looking wrong answer.
 
 ```
 M5.1 injector: trigger points, targets, seeded draws  | orchestrator | done | internal/fault
-M5.2 all six v1 fault types                           | orchestrator | done | internal/fault
+M5.2 five injectable fault types                      | orchestrator | done | internal/fault
 M5.3 FAULT_INJECTED recorded before the fault fires   | orchestrator | done | internal/faultengine
 M5.4 trigger points wired into the executor           | orchestrator | done | internal/engine
 M5.5 assert package, answered from the journal        | orchestrator | done | internal/assert
@@ -165,3 +165,29 @@ dashboard. The benchmark matrix (4 worker counts × 3 fault rates × 25 runs) wa
 measured and committed at `docs/data/benchmarks.csv`, with the hardware and
 versions on every row. Every reliability claim in `docs/reliability.md` names a
 test, and every named test was verified to exist.
+
+## Final audit
+
+An audit of the finished repository, per the master prompt's requirements. What
+it found and what was done:
+
+```
+A.1 dead exports removed (ConstraintName, AppendAll,     | orchestrator | done | internal/store, internal/event,
+    Item, sdk.Output, config.Database)                   |              |      | sdk, internal/config
+A.2 duplicate-delivery was declared and never invoked;   | orchestrator | done | internal/engine, examples
+    now implemented, with a corpus scenario proving      |              |      |
+    the ledger suppresses the repeat                     |              |      |
+A.3 queue-overload was declared and did nothing; now     | orchestrator | done | internal/fault
+    rejected at parse time and documented as unshipped   |              |      |
+A.4 FAULT_INJECTED now precedes the SIDE_EFFECT_SKIPPED  | orchestrator | done | internal/engine
+    it causes; the journal had the effect before its     |              |      |
+    cause                                                |              |      |
+A.5 scenarios may name their workflow, so the corpus     | orchestrator | done | internal/fault, test/scenarios
+    stays directory-discovered                           |              |      |
+A.6 every test named in docs/reliability.md verified to  | orchestrator | done | (docs)
+    exist; timing defaults, event types and API routes   |              |      |
+    reconciled against the code                          |              |      |
+```
+
+**No TODOs, commented-out code, debug prints or unused module dependencies
+remain in first-party code.**

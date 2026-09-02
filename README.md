@@ -310,18 +310,23 @@ return nil, sdk.Permanent(fmt.Errorf("malformed row %d: %w", i, err))
 
 ## Fault injection
 
-Six fault types, each a **real degradation** rather than a flag the scheduler
+Five fault types, each a **real degradation** rather than a flag the scheduler
 consults — a fault the scheduler knows about is one it can be written to survive
 without the recovery path ever running.
 
 | Type | What it does |
 |---|---|
 | `worker-crash` | `SIGKILL`s the worker process. No cleanup, no lease release |
-| `duplicate-delivery` | Executes an already-claimed task a second time |
+| `duplicate-delivery` | Invokes the handler again after the task completed, as a re-delivered message would |
 | `latency` | Really sleeps, pushing the task towards its lease and timeout |
 | `http-error` | Fails the task as an outbound call would |
 | `db-disconnect` | Fails the task as a dropped connection would |
-| `queue-overload` | Makes claims contend |
+
+A sixth, `queue-overload`, is named in the code and **not implemented**. Queue
+contention is a property of the whole pool rather than of one task, so it does
+not fit the per-task trigger-point model the others use. A scenario using it is
+**rejected** rather than run without it: silently accepting one would report a
+passing reliability test that never ran.
 
 ```yaml
 name: worker-crash-during-analyze

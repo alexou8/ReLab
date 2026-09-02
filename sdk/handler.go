@@ -2,7 +2,6 @@ package sdk
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -71,8 +70,7 @@ func (r *Registry) Lookup(name string) (Handler, bool) {
 	return h, ok
 }
 
-// Names returns the registered handler names, sorted, for error messages and
-// for `relab worker --list-handlers`.
+// Names returns the registered handler names, sorted, for error messages.
 func (r *Registry) Names() []string {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -122,7 +120,3 @@ func IsPermanent(err error) bool {
 	var p *PermanentError
 	return errors.As(err, &p)
 }
-
-// Output is a handler's return value once marshalled. It is stored on the task
-// and passed to dependent steps.
-type Output = json.RawMessage

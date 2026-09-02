@@ -219,5 +219,7 @@ engine mid-run and builds a new one against the same database.
 - **Not multi-region.** One PostgreSQL database is the whole system.
 - **Not authenticated.** v1 has no authentication or authorisation. See
   `SECURITY.md`.
+- **`queue-overload` is not implemented.** It is named in the code and rejected
+  at scenario-parse time, so no scenario can silently run without it.
 - **Not a general-purpose task queue.** Throughput is bounded by one Postgres
   instance; see `docs/benchmarks.md` for measured numbers.

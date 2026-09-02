@@ -20,12 +20,37 @@ const (
 	// DBDisconnect closes the worker's database connections mid-task.
 	DBDisconnect Type = "db-disconnect"
 	// QueueOverload floods the queue so that claims contend.
+	//
+	// It is DECLARED BUT NOT IMPLEMENTED in v1, and scenarios using it are
+	// rejected rather than silently running without it. Queue contention is a
+	// property of the whole pool rather than of one task, so it does not fit
+	// the per-run, per-task trigger-point model the other faults use, and
+	// bolting it on would have produced a fault that fires somewhere unrelated
+	// to where a scenario says it does. Accepting a scenario that does nothing
+	// would be worse than refusing it: it would report a passing reliability
+	// test that never ran.
 	QueueOverload Type = "queue-overload"
 )
 
+// knownTypes is what this build can actually inject. QueueOverload is
+// deliberately absent; see its declaration.
 var knownTypes = map[Type]struct{}{
 	WorkerCrash: {}, DuplicateDelivery: {}, Latency: {},
-	HTTPError: {}, DBDisconnect: {}, QueueOverload: {},
+	HTTPError: {}, DBDisconnect: {},
+}
+
+// declaredButUnimplemented gives a scenario author a better error than "unknown
+// type" for a fault this build names but cannot inject.
+var declaredButUnimplemented = map[Type]string{
+	QueueOverload: "queue contention is a property of the whole pool rather than of one " +
+		"task, so it does not fit the trigger-point model; it is planned, not shipped",
+}
+
+// Unimplemented reports whether t is a fault type ReLab names but does not yet
+// inject, and why.
+func Unimplemented(t Type) (string, bool) {
+	reason, ok := declaredButUnimplemented[t]
+	return reason, ok
 }
 
 // Known reports whether t is a fault type this build implements.
@@ -40,7 +65,7 @@ func (t Type) String() string { return string(t) }
 func TypeNames() []string {
 	return []string{
 		string(WorkerCrash), string(DuplicateDelivery), string(Latency),
-		string(HTTPError), string(DBDisconnect), string(QueueOverload),
+		string(HTTPError), string(DBDisconnect),
 	}
 }
 

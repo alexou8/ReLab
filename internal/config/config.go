@@ -41,14 +41,6 @@ const (
 	DefaultTaskTimeout = 5 * time.Minute
 )
 
-// Database describes how to reach PostgreSQL.
-type Database struct {
-	// DSN is a PostgreSQL connection string. It carries credentials, so it is
-	// read from the environment by default rather than passed on a command
-	// line, where it would be visible in the process table.
-	DSN string
-}
-
 // Timing groups the durations that determine how quickly a failure is
 // detected and recovered from. They are exposed so that the fault scenarios can
 // compress them; the defaults are what the documentation quotes.

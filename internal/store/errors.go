@@ -93,13 +93,3 @@ func sentinelFor(code string) error {
 // Classify is the exported form of classify, for packages that run their own
 // queries against a Conn obtained from this package.
 func Classify(err error) error { return classify(err) }
-
-// ConstraintName returns the constraint a write violated, and whether the error
-// carried one.
-func ConstraintName(err error) (string, bool) {
-	var ce *ConstraintError
-	if errors.As(err, &ce) {
-		return ce.Constraint, true
-	}
-	return "", false
-}

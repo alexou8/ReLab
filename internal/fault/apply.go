@@ -42,12 +42,9 @@ func apply(ctx context.Context, f Fault) error {
 	case DBDisconnect:
 		return applyDBDisconnect()
 	case DuplicateDelivery:
-		// Duplicate delivery is not applied here: it is a scheduling decision,
-		// not something that happens to a running task. The worker consults
-		// ShouldDuplicate at claim time.
-		return nil
-	case QueueOverload:
-		// Likewise a scheduling condition; see ShouldOverload.
+		// Nothing happens *to* the running task. A duplicate delivery is the
+		// handler being invoked a second time after the task has completed,
+		// which the executor does by consulting ShouldDuplicate.
 		return nil
 	default:
 		return fmt.Errorf("fault: no injector implements %q", f.Type)
@@ -120,13 +117,6 @@ func applyDBDisconnect() error {
 // which is what exercises the idempotency ledger.
 func (i *Injector) ShouldDuplicate(taskName string, attempt int) bool {
 	return i.hasFault(DuplicateDelivery, taskName, attempt)
-}
-
-// ShouldOverload reports whether a queue-overload fault applies, which makes
-// the worker claim far more aggressively than its capacity allows so that
-// claims contend.
-func (i *Injector) ShouldOverload(taskName string, attempt int) bool {
-	return i.hasFault(QueueOverload, taskName, attempt)
 }
 
 func (i *Injector) hasFault(typ Type, taskName string, attempt int) bool {

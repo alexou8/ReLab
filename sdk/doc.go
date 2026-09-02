@@ -8,12 +8,26 @@
 // A minimal program:
 //
 //	reg := sdk.NewRegistry()
+//
 //	reg.MustHandle("import_csv", func(ctx context.Context, tc *sdk.TaskContext) (any, error) {
-//		rows, err := readCSV(tc.Input())
+//		rows, err := readCSV(ctx, source)
 //		if err != nil {
 //			return nil, err
 //		}
+//		// Emit records an output by content hash, so replay can compare it.
+//		tc.Emit("imported.csv", "text/csv", raw)
 //		return map[string]int{"rows": len(rows)}, nil
+//	})
+//
+//	reg.MustHandle("validate_rows", func(ctx context.Context, tc *sdk.TaskContext) (any, error) {
+//		// Input decodes the output of a step this one declares as a dependency.
+//		// Reading around the graph is an error: the dependency is what
+//		// guarantees the step has already run.
+//		var in struct{ Rows int `json:"rows"` }
+//		if err := tc.Input("import", &in); err != nil {
+//			return nil, sdk.Permanent(err)
+//		}
+//		return map[string]int{"valid": in.Rows}, nil
 //	})
 //
 // Handlers must be safe to run more than once. ReLab delivers at least once,

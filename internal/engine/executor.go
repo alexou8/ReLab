@@ -176,12 +176,19 @@ func (x *Executor) Execute(ctx context.Context, claimed ClaimedTask) error {
 		return err
 	}
 
+	// The trigger point runs before the duplicate, so FAULT_INJECTED precedes
+	// the SIDE_EFFECT_SKIPPED the duplicate causes. The other order put the
+	// effect before its cause in the journal, which is exactly the kind of
+	// thing someone reading a timeline during an incident should never have to
+	// second-guess.
 	if err := x.trigger(ctx, claimed.RunID, pointAfterTaskFinish,
 		claimed.Task.Name, claimed.Task.Attempt); err != nil {
 		// The task is already recorded; a fault here can only be reported.
 		x.log.WarnContext(ctx, "fault fired after the task was recorded",
 			"run_id", claimed.RunID, "task", claimed.Task.Name, "error", err)
 	}
+
+	x.maybeDeliverTwice(ctx, handler, claimed)
 	return nil
 }
 
@@ -332,4 +339,47 @@ func (x *Executor) recordOutcome(ctx context.Context, span trace.Span,
 
 	metrics.RecordTaskExecution(ctx, status, claimed.WorkflowName,
 		claimed.Task.Name, outcome.Duration.Seconds())
+}
+
+// maybeDeliverTwice re-invokes the handler when a duplicate-delivery fault
+// applies to this attempt.
+//
+// This is the fault that exercises the idempotency ledger directly. A real
+// duplicate delivery is a message the queue hands out twice: the handler runs
+// again, over the same inputs, having already completed. So that is what this
+// does — the handler is invoked a second time with a fresh TaskContext at the
+// same attempt, and the result is discarded, because the task is already
+// recorded as finished.
+//
+// It deliberately does not go through the state machine. Claiming or starting
+// the task again would be refused, correctly, by the very constraints that
+// prevent accidental double execution; the point of the fault is to reach the
+// handler despite them, which is exactly the position a re-delivered message
+// puts you in.
+func (x *Executor) maybeDeliverTwice(ctx context.Context, handler sdk.Handler, claimed ClaimedTask) {
+	if x.faults == nil {
+		return
+	}
+	points, err := x.faults.For(ctx, claimed.RunID)
+	if err != nil || points == nil {
+		return
+	}
+	if !points.ShouldDuplicate(claimed.Task.Name, claimed.Task.Attempt) {
+		return
+	}
+
+	x.log.WarnContext(ctx, "duplicate delivery injected: re-invoking the handler",
+		"run_id", claimed.RunID, "task", claimed.Task.Name, "attempt", claimed.Task.Attempt)
+
+	ledger := newLedger(x.engine, claimed.Task, x.workerID)
+	tc := sdk.NewTaskContext(claimed.RunID, claimed.Task.Name, claimed.Task.Attempt,
+		x.workerID, claimed.Inputs, ledger)
+
+	duplicate := x.invoke(ctx, handler, tc, claimed)
+	if duplicate.Err != nil {
+		// The duplicate's failure is not the task's: the task already
+		// succeeded and is recorded. It is logged so a scenario author can see
+		// that the second delivery happened and what it did.
+		x.log.WarnContext(ctx, "duplicate delivery failed", "error", duplicate.Err)
+	}
 }

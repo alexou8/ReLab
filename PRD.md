@@ -42,7 +42,7 @@ and it is a different product, which the README says in its first paragraph.
 3. Kill a worker mid-task and watch the task recover, automatically.
 4. Prove no duplicate side effect resulted.
 5. Replay a run's history and reconstruct its state.
-6. Inject six named failure modes deterministically.
+6. Inject five named failure modes deterministically.
 7. Assert on recovery from CI, with a non-zero exit on failure.
 8. Publish benchmarks that were measured rather than claimed.
 
@@ -69,7 +69,7 @@ claim — *recovery works, and here is the proof* — any more credible.
 | Dead-letter queue | `internal/engine` |
 | Append-only event journal, gapless and versioned | `internal/event` |
 | Replay to logical state, with divergence reporting | `internal/replay` |
-| Six deterministic fault types | `internal/fault` |
+| Five deterministic fault types | `internal/fault` |
 | Reliability assertions with CI exit codes | `internal/assert`, `relab test` |
 | Traces, metrics and correlated logs | `internal/telemetry` |
 | Benchmark harness with committed results | `internal/bench` |

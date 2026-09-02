@@ -51,9 +51,19 @@ would not resemble any real deployment — the compose stack uses
   It comes from position-derived draws (decision 0002's reasoning applied to
   fault decisions) and from explicit `at:` trigger points, which `relab test`
   requires unless `--allow-random` is passed.
-- `duplicate-delivery` and `queue-overload` are scheduling conditions rather
-  than things that happen to a running task, so they are consulted at claim
-  time instead of applied at a trigger point.
+- `duplicate-delivery` is not something that happens *to* a running task: it is
+  the handler being invoked a second time after the task completed, which is
+  what a re-delivered message does. The executor does that directly, after the
+  trigger point has recorded `FAULT_INJECTED`, so the journal shows the cause
+  before the `SIDE_EFFECT_SKIPPED` it produces.
+- `queue-overload` is **declared and not implemented**. Queue contention is a
+  property of the whole pool rather than of one task, and it does not fit the
+  per-run, per-task trigger-point model; bolting it on would have produced a
+  fault firing somewhere unrelated to where the scenario says it does. A
+  scenario using it is rejected at parse time. This was found by an audit that
+  asked which declared types actually did anything — the answer was four of six
+  — and accepting a scenario that does nothing would report a passing
+  reliability test that never ran.
 - A scenario file has to say which attempt it targets when the fault would
   otherwise fire on every one. `worker-crash` without `attempt: 1` kills every
   worker that picks the task up, and the run can never finish — which the first

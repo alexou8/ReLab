@@ -20,10 +20,15 @@ import (
 
 // Scenario is a validated fault scenario.
 type Scenario struct {
-	Name   string     `yaml:"name"`
-	Seed   int64      `yaml:"seed"`
-	Faults []Fault    `yaml:"faults,omitempty"`
-	Assert Assertions `yaml:"assert"`
+	Name string `yaml:"name"`
+	Seed int64  `yaml:"seed"`
+	// Workflow names the definition file this scenario applies to, relative to
+	// the repository root. It exists so the corpus can be discovered from the
+	// directory: a scenario that targets a task only one workflow has must say
+	// which, or the runner has to guess.
+	Workflow string     `yaml:"workflow,omitempty"`
+	Faults   []Fault    `yaml:"faults,omitempty"`
+	Assert   Assertions `yaml:"assert"`
 
 	// Hash is the sha256 of the canonical re-marshalling, so a run records
 	// which scenario it ran under precisely enough to detect an edit.
@@ -111,8 +116,13 @@ func (s *Scenario) validate() error {
 	for i, f := range s.Faults {
 		where := fmt.Sprintf("fault %d", i+1)
 		if !f.Type.Known() {
-			problems = append(problems, fmt.Sprintf("%s: unknown type %q (known types: %s)",
-				where, f.Type, strings.Join(TypeNames(), ", ")))
+			if reason, planned := Unimplemented(f.Type); planned {
+				problems = append(problems, fmt.Sprintf(
+					"%s: %q is not implemented in this build: %s", where, f.Type, reason))
+			} else {
+				problems = append(problems, fmt.Sprintf("%s: unknown type %q (known types: %s)",
+					where, f.Type, strings.Join(TypeNames(), ", ")))
+			}
 		}
 		switch {
 		case f.At == "" && f.Probability == 0:

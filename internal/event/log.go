@@ -119,27 +119,6 @@ func Append(ctx context.Context, tx Appender, runID uuid.UUID, p Payload, meta M
 	return evt, nil
 }
 
-// AppendAll writes several events in order within one transaction. It exists so
-// that a state change producing more than one event (a lease expiring and the
-// task being requeued, say) cannot be interrupted between them.
-func AppendAll(ctx context.Context, tx Appender, runID uuid.UUID, items ...Item) ([]Event, error) {
-	out := make([]Event, 0, len(items))
-	for i, item := range items {
-		evt, err := Append(ctx, tx, runID, item.Payload, item.Meta)
-		if err != nil {
-			return out, fmt.Errorf("event: append item %d of %d: %w", i+1, len(items), err)
-		}
-		out = append(out, evt)
-	}
-	return out, nil
-}
-
-// Item pairs a payload with its metadata for AppendAll.
-type Item struct {
-	Payload Payload
-	Meta    Meta
-}
-
 // Read returns a run's complete history in sequence order.
 //
 // It verifies gaplessness as it reads: the journal is the input to replay, and
