@@ -29,6 +29,12 @@ type Config struct {
 	// MaxConns bounds the pool. The default is deliberately small: a worker
 	// holds at most one transaction per concurrent task, and an unbounded pool
 	// converts database saturation into a much less debuggable timeout storm.
+	//
+	// It does have to exceed the number of things that hold a connection at
+	// once. A process running more concurrent tasks than it has connections
+	// serialises on the pool, which looks exactly like a slow database — this
+	// was measured before it was understood, and it is why the benchmark sizes
+	// the pool from the worker count.
 	MaxConns int32
 	// MaxConnLifetime recycles connections so that a failed-over primary does
 	// not keep serving from stale backends indefinitely.

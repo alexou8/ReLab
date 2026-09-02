@@ -121,6 +121,7 @@ const (
 	EnvLogFormat         = "RELAB_LOG_FORMAT"
 	EnvOTLPEndpoint      = "RELAB_OTLP_ENDPOINT"
 	EnvWorkerConcurrency = "RELAB_WORKER_CONCURRENCY"
+	EnvDBMaxConns        = "RELAB_DB_MAX_CONNS"
 )
 
 // DSN returns the configured connection string. The flag wins over the

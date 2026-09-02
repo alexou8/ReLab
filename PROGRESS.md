@@ -142,3 +142,26 @@ leases that expired 24 hours ago — makes the same command exit 1 with the run
 never completing, because a SIGKILLed worker's task has no other way back.
 `TestScenarioCorpus` runs all five scenarios and checks that the command's exit
 code agrees with its report, so a CI step cannot pass on a failing scenario.
+
+## M6 — Observability, benchmarks, dashboard, documentation
+
+```
+M6.1 OTel traces, metrics, trace-correlated logs      | orchestrator | done | internal/telemetry
+M6.2 executor spans and the reliability metric set    | orchestrator | done | internal/engine
+M6.3 benchmark harness: percentiles, CSV, environment | orchestrator | done | internal/bench
+M6.4 `relab bench` and the matrix                     | orchestrator | done | internal/cli
+M6.5 connection pool sizing (RELAB_DB_MAX_CONNS)      | orchestrator | done | internal/store, internal/cli
+M6.6 read-only Next.js dashboard, 4 views             | orchestrator | done | web/
+M6.7 measured benchmark matrix, committed CSV         | orchestrator | done | docs/data
+M6.8 README, ARCHITECTURE, DATA, SECURITY, PRD        | orchestrator | done | (root)
+M6.9 CLAUDE.md, AGENTS.md, SKILLS.md                  | orchestrator | done | (root)
+M6.A docs/reliability.md, docs/benchmarks.md          | orchestrator | done | docs/
+```
+
+**Acceptance:** `docker compose up` brings up PostgreSQL, the control plane,
+three individually killable workers and the dashboard; `docker compose kill
+worker-2` during a run produces a visible recovery in the timeline and in the
+dashboard. The benchmark matrix (4 worker counts × 3 fault rates × 25 runs) was
+measured and committed at `docs/data/benchmarks.csv`, with the hardware and
+versions on every row. Every reliability claim in `docs/reliability.md` names a
+test, and every named test was verified to exist.

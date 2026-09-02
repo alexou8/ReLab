@@ -79,7 +79,16 @@ func (g *global) openDB(ctx context.Context) (*store.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	db, err := store.Open(ctx, store.DefaultConfig(dsn))
+	cfg := store.DefaultConfig(dsn)
+	maxConns, err := config.Int(config.EnvDBMaxConns, int(cfg.MaxConns))
+	if err != nil {
+		return nil, err
+	}
+	if maxConns > 0 {
+		cfg.MaxConns = int32(maxConns)
+	}
+
+	db, err := store.Open(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("connect to database: %w", err)
 	}

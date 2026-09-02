@@ -51,6 +51,24 @@ func newBenchCmd(g *global, version string) *cobra.Command {
 				return fmt.Errorf("--runs must be at least 1")
 			}
 
+			// Each in-process runner holds a connection while it works, so a
+			// pool smaller than the worker count makes the runners queue on
+			// the pool rather than on the database. That reads as a throughput
+			// ceiling that has nothing to do with the system under test, so
+			// the pool is sized from the matrix before connecting.
+			maxWorkers := 0
+			for _, w := range workers {
+				if w > maxWorkers {
+					maxWorkers = w
+				}
+			}
+			if os.Getenv(config.EnvDBMaxConns) == "" {
+				// +4 for the coordinator, the run creation loop and headroom.
+				if err := os.Setenv(config.EnvDBMaxConns, strconv.Itoa(maxWorkers+4)); err != nil {
+					return fmt.Errorf("size the connection pool: %w", err)
+				}
+			}
+
 			db, err := g.openDB(ctx)
 			if err != nil {
 				return err
