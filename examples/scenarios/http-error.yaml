@@ -1,0 +1,16 @@
+# An upstream returning 503 on the first attempt of `validate`. The retry policy
+# should absorb it: the run succeeds, having retried exactly once.
+name: upstream-503-on-validate
+seed: 2024
+faults:
+  - type: http-error
+    target: {task: validate, attempt: 1}
+    at: after-task-start
+    params: {status: 503}
+assert:
+  run_status: SUCCEEDED
+  lost_tasks: 0
+  duplicate_effects: 0
+  min_retries_per_task: 1
+  max_retries_per_task: 1
+  faults_injected: 1

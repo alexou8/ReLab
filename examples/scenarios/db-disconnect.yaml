@@ -1,0 +1,15 @@
+# The database connection drops under `import` on its first attempt. This is the
+# most ordinary production failure there is, and it must be entirely absorbed by
+# the retry policy.
+name: db-disconnect-on-import
+seed: 8675309
+faults:
+  - type: db-disconnect
+    target: {task: import, attempt: 1}
+    at: after-task-start
+assert:
+  run_status: SUCCEEDED
+  lost_tasks: 0
+  duplicate_effects: 0
+  min_retries_per_task: 1
+  faults_injected: 1

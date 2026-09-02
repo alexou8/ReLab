@@ -1,0 +1,216 @@
+package cli
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log/slog"
+
+	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
+
+	"github.com/alexou8/relab/internal/config"
+	"github.com/alexou8/relab/internal/engine"
+	"github.com/alexou8/relab/internal/fault"
+	"github.com/alexou8/relab/internal/faultengine"
+	"github.com/alexou8/relab/internal/telemetry"
+	"github.com/alexou8/relab/internal/worker"
+)
+
+func newServerCmd(g *global, version string) *cobra.Command {
+	var addr string
+	cmd := &cobra.Command{
+		Use:   "server",
+		Short: "Run the control plane: the recovery sweep and the HTTP API",
+		Long: "The control plane owns nothing in memory. Several may run at once — the sweep's\n" +
+			"queries take row locks with SKIP LOCKED, so they divide the work — and one that\n" +
+			"restarts resumes by sweeping again.",
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			ctx := cmd.Context()
+			log := newLogger()
+
+			// Telemetry is diagnostic; the workflows are the job. A control
+			// plane that refuses to start because it could not reach a
+			// collector would turn an observability problem into an outage.
+			providers := setupTelemetry(ctx, log, "control-plane", version)
+			defer shutdownTelemetry(ctx, log, providers)
+
+			db, err := g.openDB(ctx)
+			if err != nil {
+				return err
+			}
+			defer db.Close()
+
+			// Migrating on start-up keeps `docker compose up` to one command.
+			// It is safe under a race because the runner takes an advisory
+			// lock; the workers do the same.
+			if _, err := db.Migrate(ctx); err != nil {
+				return err
+			}
+
+			timing, err := config.TimingFromEnv()
+			if err != nil {
+				return err
+			}
+			eng, err := engine.New(db, engine.Options{Timing: timing, Logger: log})
+			if err != nil {
+				return err
+			}
+
+			group, gctx := errgroup.WithContext(ctx)
+			group.Go(func() error { return engine.NewCoordinator(eng, log).Run(gctx) })
+			group.Go(func() error { return serveAPI(gctx, eng, addr, log, version) })
+			if err := group.Wait(); err != nil && !errors.Is(err, ctx.Err()) {
+				return err
+			}
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&addr, "addr", config.String(config.EnvListenAddr, ":8080"),
+		"address for the HTTP API (default: $"+config.EnvListenAddr+" or :8080)")
+	return cmd
+}
+
+func newWorkerCmd(g *global, version string) *cobra.Command {
+	var concurrency int
+	var scenarioPath string
+	cmd := &cobra.Command{
+		Use:   "worker",
+		Short: "Run a worker that claims and executes tasks",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			ctx := cmd.Context()
+			log := newLogger()
+
+			providers := setupTelemetry(ctx, log, "worker", version)
+			defer shutdownTelemetry(ctx, log, providers)
+
+			db, err := g.openDB(ctx)
+			if err != nil {
+				return err
+			}
+			defer db.Close()
+			if _, err := db.Migrate(ctx); err != nil {
+				return err
+			}
+
+			timing, err := config.TimingFromEnv()
+			if err != nil {
+				return err
+			}
+			eng, err := engine.New(db, engine.Options{Timing: timing, Logger: log})
+			if err != nil {
+				return err
+			}
+			var faults engine.FaultSource
+			if scenarioPath != "" {
+				scenario, err := fault.LoadScenario(scenarioPath)
+				if err != nil {
+					return err
+				}
+				// The worker injects only the scenario it was given. A run
+				// started under a scenario this worker does not have fails
+				// loudly rather than running unfaulted, which would report a
+				// passing reliability test that never ran.
+				faults = faultengine.NewSource(eng, faultengine.StaticLookup(scenario))
+				log.InfoContext(ctx, "fault injection enabled",
+					"scenario", scenario.Name, "seed", scenario.Seed)
+			}
+
+			w, err := worker.New(ctx, eng, defaultRegistry(), worker.Options{
+				Concurrency: concurrency,
+				Version:     version,
+				Logger:      log,
+				Faults:      faults,
+			})
+			if err != nil {
+				return err
+			}
+			return w.Run(ctx)
+		},
+	}
+	defaultConcurrency, err := config.Int(config.EnvWorkerConcurrency, 4)
+	if err != nil {
+		// Reported when the command runs rather than at construction, so a bad
+		// environment variable does not break every other subcommand's help.
+		cmd.RunE = func(*cobra.Command, []string) error { return err }
+		defaultConcurrency = 4
+	}
+	cmd.Flags().IntVar(&concurrency, "concurrency", defaultConcurrency,
+		"tasks to execute at once (default: $"+config.EnvWorkerConcurrency+" or 4)")
+	cmd.Flags().StringVar(&scenarioPath, "scenario", "",
+		"inject this scenario's faults into runs started under it")
+	return cmd
+}
+
+func newWorkersCmd(g *global) *cobra.Command {
+	return &cobra.Command{
+		Use:   "workers",
+		Short: "List registered workers and their liveness",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			ctx := cmd.Context()
+			db, err := g.openDB(ctx)
+			if err != nil {
+				return err
+			}
+			defer db.Close()
+			eng, err := engine.New(db, engine.Options{})
+			if err != nil {
+				return err
+			}
+			workers, err := eng.ListWorkers(ctx)
+			if err != nil {
+				return err
+			}
+			if g.json {
+				return writeJSON(cmd, workers)
+			}
+			if len(workers) == 0 {
+				cmd.Println("no workers registered")
+				return nil
+			}
+			cmd.Printf("%-38s %-9s %-18s %-10s %s\n", "ID", "STATUS", "HOSTNAME", "LOAD", "LAST HEARTBEAT")
+			for _, w := range workers {
+				cmd.Printf("%-38s %-9s %-18s %-10s %s\n",
+					w.ID, w.Status, w.Hostname,
+					fmt.Sprintf("%d/%d", w.ActiveTasks, w.Capacity),
+					w.LastHeartbeat.Format("15:04:05"))
+			}
+			return nil
+		},
+	}
+}
+
+// newLogger builds the structured logger the long-running commands use.
+//
+// It goes through telemetry so every line logged inside a span carries the
+// trace_id, which is what lets a reader move between a log and a trace when
+// several runs are in flight.
+func newLogger() *slog.Logger {
+	return telemetry.NewLogger(
+		config.String(config.EnvLogLevel, "info"),
+		config.String(config.EnvLogFormat, "text"))
+}
+
+// setupTelemetry installs the trace and metric providers, reporting a failure
+// rather than propagating it.
+//
+// A process that cannot export telemetry can still run workflows correctly, and
+// the instruments are nil-safe throughout, so refusing to start would trade a
+// missing graph for an outage.
+func setupTelemetry(ctx context.Context, log *slog.Logger, component, version string) *telemetry.Providers {
+	providers, err := telemetry.Setup(ctx, telemetry.ConfigFromEnv(component, version))
+	if err != nil {
+		log.WarnContext(ctx, "telemetry is disabled: setup failed", "error", err)
+		return nil
+	}
+	return providers
+}
+
+func shutdownTelemetry(ctx context.Context, log *slog.Logger, providers *telemetry.Providers) {
+	if err := providers.Shutdown(ctx); err != nil {
+		log.WarnContext(ctx, "telemetry shutdown", "error", err)
+	}
+}

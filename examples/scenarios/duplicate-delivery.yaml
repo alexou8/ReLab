@@ -1,0 +1,21 @@
+# Deliver `charge` twice: the handler is invoked a second time after the task
+# has already completed, which is exactly what a re-delivered queue message
+# does.
+#
+# The assertion that matters is duplicate_effects: 0. The handler runs twice and
+# the external charge happens once, because the second invocation finds the
+# effect already recorded and skips it — which shows up in the journal as
+# SIDE_EFFECT_SKIPPED.
+name: duplicate-delivery-on-charge
+seed: 31337
+workflow: examples/effectful.yaml
+faults:
+  - type: duplicate-delivery
+    target: {task: charge, attempt: 1}
+    at: after-task-finish
+assert:
+  run_status: SUCCEEDED
+  lost_tasks: 0
+  duplicate_effects: 0
+  max_retries_per_task: 0
+  faults_injected: 1

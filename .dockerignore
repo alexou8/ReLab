@@ -1,0 +1,7 @@
+.git
+.github
+bin
+dist
+web/node_modules
+web/.next
+*.md

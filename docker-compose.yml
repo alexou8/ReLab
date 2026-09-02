@@ -1,0 +1,94 @@
+# Local ReLab stack: PostgreSQL, the control plane, and three workers — enough
+# to kill a worker mid-run and watch the task recover, which is the point.
+#
+#   docker compose up --build
+#   docker compose exec api relab run /examples/data-pipeline.yaml
+#   docker compose kill worker-2      # while a run is in flight
+#   docker compose exec api relab run inspect <run-id>
+#
+# The dashboard is at http://localhost:3000 and the API at http://localhost:8080.
+
+x-relab-env: &relab-env
+  RELAB_DSN: postgres://relab:relab@postgres:5432/relab?sslmode=disable
+  RELAB_LOG_FORMAT: text
+  RELAB_LOG_LEVEL: info
+  # Compressed from the 30s production default so a reviewer sees recovery
+  # happen rather than waiting for it. docs/reliability.md gives the defaults
+  # and what they cost.
+  RELAB_LEASE_DURATION: 6s
+  RELAB_LEASE_RENEW_INTERVAL: 2s
+  RELAB_HEARTBEAT_INTERVAL: 1s
+  RELAB_REAPER_INTERVAL: 500ms
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: relab
+      POSTGRES_PASSWORD: relab
+      POSTGRES_DB: relab
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # Without this the API and the workers race the database on a cold start
+      # and crash-loop until it is ready.
+      test: ["CMD-SHELL", "pg_isready -U relab -d relab"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  api:
+    build:
+      context: .
+      args:
+        VERSION: compose
+    command: ["server", "--addr", ":8080"]
+    environment: *relab-env
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Three workers rather than one replica set, so that an individual one can be
+  # killed by name: `docker compose kill worker-2`.
+  worker-1: &worker
+    build:
+      context: .
+      args:
+        VERSION: compose
+    command: ["worker", "--concurrency", "4"]
+    environment: *relab-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker-2:
+    <<: *worker
+
+  worker-3:
+    <<: *worker
+
+  # The dashboard is a debugging surface, not the product. It is read-only and
+  # renders on the server, so it holds no credential and cannot change anything.
+  dashboard:
+    build:
+      context: ./web
+    environment:
+      RELAB_API_URL: http://api:8080
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  pgdata:

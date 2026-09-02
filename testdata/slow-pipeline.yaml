@@ -1,0 +1,15 @@
+# A workflow whose middle step takes long enough to be interrupted. Used by the
+# process-level crash tests and by the docker compose demo, where the point is
+# to kill a worker while a task is genuinely running.
+name: slow-pipeline
+version: 1
+steps:
+  - name: import
+    handler: import_csv
+  - name: crunch
+    handler: slow_step
+    depends_on: [import]
+    retry: {max_attempts: 3, initial_delay: 100ms, multiplier: 2, max_delay: 2s, jitter: 0.1}
+  - name: report
+    handler: summarize
+    depends_on: [crunch]

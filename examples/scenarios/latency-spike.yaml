@@ -1,0 +1,18 @@
+# A slow dependency: the analyze step is delayed past its lease, so the
+# coordinator has to decide whether the worker is dead. It is not — renewal
+# keeps the lease alive — and the run should complete with no retry at all.
+# A failure here means lease renewal is not working, which is the bug the M2
+# crash test found once already.
+name: latency-during-analyze
+seed: 1337
+faults:
+  - type: latency
+    target: {task: analyze}
+    at: after-task-start
+    params: {duration: "2s"}
+assert:
+  run_status: SUCCEEDED
+  lost_tasks: 0
+  duplicate_effects: 0
+  max_retries_per_task: 0
+  faults_injected: 1

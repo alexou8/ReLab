@@ -1,0 +1,131 @@
+name: ci
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+# A newer push makes an in-flight run irrelevant.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: "1.25"
+  # Pinned, and kept in step with the version contributors run locally.
+  GOLANGCI_VERSION: "v2.5.0"
+
+jobs:
+  check:
+    name: vet, lint and test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: relab
+          POSTGRES_PASSWORD: relab
+          POSTGRES_DB: relab
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U relab"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    env:
+      # The integration tests create and drop their own databases against this
+      # instance; they skip when it is unset.
+      RELAB_TEST_DSN: postgres://relab:relab@localhost:5432/postgres?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Verify formatting
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "these files are not gofmt-clean:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Verify go.mod is tidy
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
+
+      # Building the binary explicitly, by package path. `go build ./...` would
+      # pass on a checkout that is missing cmd/relab entirely, which is exactly
+      # what a too-broad .gitignore pattern once produced — the entry point was
+      # absent from the repository and every other check stayed green.
+      - name: Build
+        run: go build -o /tmp/relab ./cmd/relab
+
+      - run: go vet ./...
+
+      # Installed with `go install` at a pinned version rather than through
+      # golangci-lint-action.
+      #
+      # The action's "latest" resolves to the golangci-lint v1 line, which is
+      # built with Go 1.24 and refuses outright to lint a module targeting Go
+      # 1.25 ("the Go language version used to build golangci-lint is lower
+      # than the targeted Go version"). This repository's .golangci.yml is v2
+      # schema regardless.
+      #
+      # `go install` also has a property a prebuilt binary does not: it builds
+      # the linter with the same toolchain that builds the project, so the two
+      # cannot drift into that mismatch again. Pinning the version on top means
+      # a new release cannot turn a green branch red overnight.
+      - name: Install golangci-lint
+        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${{ env.GOLANGCI_VERSION }}
+
+      - name: Lint
+        run: golangci-lint run ./...
+
+      - name: Test
+        run: go test -race -timeout 15m ./...
+
+  scenarios:
+    name: fault scenario corpus
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: relab
+          POSTGRES_PASSWORD: relab
+          POSTGRES_DB: relab
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U relab"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    env:
+      RELAB_TEST_DSN: postgres://relab:relab@localhost:5432/postgres?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      # Every file in examples/scenarios runs here. The corpus is discovered
+      # from the directory, so adding a scenario to the repository is enough to
+      # add it to CI — a corpus that has to be registered in two places quietly
+      # stops covering the newest cases.
+      - name: Run the scenario corpus
+        run: go test -v -timeout 15m ./test/scenarios/
+
+      # The process-level suite spawns real worker binaries and SIGKILLs them.
+      # It is the suite that distinguishes recovery that works from recovery
+      # that is only claimed, so it runs on every push rather than nightly.
+      - name: Run the process-level crash suite
+        run: go test -v -timeout 15m ./test/process/

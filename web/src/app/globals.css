@@ -1,0 +1,262 @@
+/*
+ * A deliberately plain visual system. The dashboard's job is to make a run's
+ * history legible during a failure; anything that competes with the data for
+ * attention is working against that.
+ */
+
+:root {
+  --bg: #ffffff;
+  --surface: #f7f8fa;
+  --border: #e2e5ea;
+  --text: #14161a;
+  --muted: #5f6672;
+  --accent: #1f5fd0;
+
+  --ok: #1a7f4b;
+  --warn: #a8620a;
+  --bad: #b3261e;
+  --idle: #5f6672;
+
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1013;
+    --surface: #171a1f;
+    --border: #2a2f37;
+    --text: #e8eaee;
+    --muted: #9aa2ae;
+    --accent: #6ea8fe;
+
+    --ok: #4ec97f;
+    --warn: #e0a458;
+    --bad: #f2756a;
+    --idle: #9aa2ae;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover,
+a:focus-visible {
+  text-decoration: underline;
+}
+
+/* A visible focus ring on every interactive element: this is a debugging tool,
+   and someone will drive it from the keyboard while reading a terminal. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.layout {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 20px 64px;
+}
+
+header.masthead {
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+header.masthead h1 {
+  font-size: 18px;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+header.masthead p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+nav.tabs {
+  display: flex;
+  gap: 16px;
+  font-size: 14px;
+}
+
+h2 {
+  font-size: 15px;
+  margin: 32px 0 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+h2:first-of-type {
+  margin-top: 0;
+}
+
+/* Counts */
+.counts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.count {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px 14px;
+  background: var(--surface);
+}
+
+.count .value {
+  font-size: 26px;
+  font-variant-numeric: tabular-nums;
+  font-family: var(--mono);
+}
+
+.count .label {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Tables */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+th {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+td.mono,
+th.mono {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+/* Status */
+.status {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.status-ok {
+  color: var(--ok);
+}
+.status-bad {
+  color: var(--bad);
+}
+.status-warn {
+  color: var(--warn);
+}
+.status-idle {
+  color: var(--idle);
+}
+
+/* Empty and error states */
+.notice {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--warn);
+  border-radius: 4px;
+  background: var(--surface);
+  padding: 14px 16px;
+  font-size: 14px;
+}
+
+.notice h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+
+.notice p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.notice code {
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.empty {
+  color: var(--muted);
+  font-size: 14px;
+  padding: 16px 0;
+}
+
+/* Run detail */
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px 24px;
+  margin-bottom: 8px;
+}
+
+.fact .label {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.fact .value {
+  font-family: var(--mono);
+  font-size: 14px;
+  word-break: break-all;
+}
+
+.detail {
+  color: var(--muted);
+  font-size: 13px;
+  font-family: var(--mono);
+}
+
+.back {
+  font-size: 13px;
+  display: inline-block;
+  margin-bottom: 16px;
+}

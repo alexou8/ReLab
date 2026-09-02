@@ -1,0 +1,79 @@
+# golangci-lint configuration for ReLab.
+#
+# The linter set is chosen for the failure modes this codebase is exposed to:
+# unchecked errors and lost contexts in database code, resource leaks in the
+# worker loop, and copied locks in the scheduler. Style-only linters are left
+# out — gofmt settles style, and a lint failure should mean something.
+version: "2"
+
+linters:
+  enable:
+    - bodyclose      # HTTP response leaks in the fault injectors and API tests
+    - contextcheck   # a dropped context breaks cancellation, which is a feature here
+    - copyloopvar
+    - durationcheck  # time arithmetic drives leases and backoff
+    - errorlint      # %w and errors.Is/As, per the error handling conventions
+    - goconst
+    - gocritic
+    - misspell
+    - nilerr
+    - noctx
+    - prealloc
+    - revive
+    - rowserrcheck   # a missed rows.Err() silently truncates a result set
+    - sqlclosecheck
+    - unconvert
+    - unparam
+    - usetesting
+    - wastedassign
+
+  settings:
+    errcheck:
+      # check-blank stays off on purpose. The convention here is that a
+      # deliberate best-effort call is written `_ = f()`, which makes the
+      # decision visible in review; turning it into a lint failure would only
+      # force a nolint comment next to every one of them.
+      check-blank: false
+    revive:
+      rules:
+        # revive's default rule set, minus `exported`. Payload types document
+        # themselves on the struct; a mandatory "Type returns the type" comment
+        # on each of the twenty-one Type() methods is noise that trains readers
+        # to skip doc comments.
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: dot-imports
+        - name: error-return
+        - name: error-strings
+        - name: error-naming
+        - name: increment-decrement
+        - name: var-naming
+        - name: package-comments
+        - name: range
+        - name: receiver-naming
+        - name: time-naming
+        - name: indent-error-flow
+        - name: errorf
+        - name: unreachable-code
+        - name: superfluous-else
+
+  exclusions:
+    rules:
+      # Table-driven tests legitimately ignore errors they have already
+      # asserted on, and long test functions are clearer than split ones.
+      - path: _test\.go
+        linters: [errcheck, goconst, unparam]
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/alexou8/relab
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

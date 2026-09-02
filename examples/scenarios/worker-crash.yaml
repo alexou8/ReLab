@@ -1,0 +1,20 @@
+# Kill the worker holding `analyze` the moment its handler starts. The process
+# gets no chance to release its lease, so the task can only come back through
+# lease expiry — which is the mechanism that also works when a machine loses
+# power.
+#
+# The fault targets attempt 1 only. Without that it would fire on every attempt
+# and the run could never finish, which would make the scenario a test of the
+# retry limit rather than of recovery.
+name: worker-crash-during-analyze
+seed: 42
+faults:
+  - type: worker-crash
+    target: {task: analyze, attempt: 1}
+    at: after-task-start
+assert:
+  run_status: SUCCEEDED
+  lost_tasks: 0
+  duplicate_effects: 0
+  max_recovery_time_ms: 5000
+  max_retries_per_task: 2
