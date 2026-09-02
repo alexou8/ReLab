@@ -14,6 +14,7 @@ import (
 	"github.com/alexou8/relab/internal/engine"
 	"github.com/alexou8/relab/internal/event"
 	"github.com/alexou8/relab/internal/fault"
+	"github.com/alexou8/relab/internal/faultengine"
 	"github.com/alexou8/relab/internal/workflow"
 )
 
@@ -50,15 +51,24 @@ func newRunCmd(g *global) *cobra.Command {
 			}
 
 			opts := engine.CreateRunOptions{Seed: seed, CorrelationID: correlation}
+			var scenario *fault.Scenario
 			if scenarioPath != "" {
-				// Scenario files are loaded and hashed here so that the run
-				// records which scenario produced it; the injectors themselves
-				// live in package fault and run inside the worker.
-				name, hash, err := scenarioIdentity(scenarioPath)
-				if err != nil {
+				if scenario, err = fault.LoadScenario(scenarioPath); err != nil {
 					return err
 				}
-				opts.ScenarioName, opts.ScenarioHash = name, hash
+				// `run` drives the run in this process, so a fault that kills
+				// the worker would kill the command doing the asserting. Those
+				// scenarios need spawned workers, which `relab test` arranges.
+				if scenario.NeedsSeparateWorkers() {
+					return fmt.Errorf(
+						"scenario %q kills the worker process, which here is this one; "+
+							"run it with `relab test <workflow> --scenario %s`, which spawns "+
+							"workers to kill", scenario.Name, scenarioPath)
+				}
+				opts.ScenarioName, opts.ScenarioHash = scenario.Name, scenario.Hash
+				if seed == 0 {
+					opts.Seed = scenario.Seed
+				}
 			}
 
 			run, err := eng.CreateRun(ctx, wf, def, opts)
@@ -75,19 +85,33 @@ func newRunCmd(g *global) *cobra.Command {
 				return nil
 			}
 
-			runner, err := engine.NewLocalRunner(ctx, eng, defaultRegistry(), nil)
-			if err != nil {
-				return err
-			}
 			started := time.Now()
-			final, err := runner.Run(ctx, run.ID)
+			if scenario != nil {
+				// The scenario's faults are injected as the run executes.
+				// Recording only the scenario's name, as this command used to,
+				// produced a run labelled with a scenario whose faults never
+				// fired -- a run whose history said something untrue about it.
+				source := faultengine.NewSource(eng, faultengine.StaticLookup(scenario))
+				if err := eng.DriveWithFaults(ctx, run.ID, defaultRegistry(), source); err != nil {
+					return err
+				}
+			} else {
+				runner, err := engine.NewLocalRunner(ctx, eng, defaultRegistry(), nil)
+				if err != nil {
+					return err
+				}
+				if _, err := runner.Run(ctx, run.ID); err != nil {
+					return err
+				}
+			}
+			final, err := eng.RunByID(ctx, run.ID)
 			if err != nil {
 				return err
 			}
 			return reportRun(ctx, cmd, g, eng, final, time.Since(started))
 		},
 	}
-	cmd.Flags().StringVar(&scenarioPath, "scenario", "", "fault scenario file to run under")
+	cmd.Flags().StringVar(&scenarioPath, "scenario", "", "fault scenario file whose faults are injected into this run")
 	cmd.Flags().Int64Var(&seed, "seed", 0, "seed for the run's deterministic RNG (0 chooses one and records it)")
 	cmd.Flags().StringVar(&correlation, "correlation-id", "", "identifier tying this run to something outside ReLab")
 	cmd.Flags().BoolVar(&detach, "detach", false, "create the run without executing it, for a worker pool to claim")
@@ -334,16 +358,6 @@ func firstLine(s string) string {
 		return s[:i]
 	}
 	return s
-}
-
-// scenarioIdentity reads a scenario file's name and hash so the run records
-// which scenario produced it.
-func scenarioIdentity(path string) (name, hash string, err error) {
-	sc, err := fault.LoadScenario(path)
-	if err != nil {
-		return "", "", err
-	}
-	return sc.Name, sc.Hash, nil
 }
 
 func newRunCancelCmd(g *global) *cobra.Command {

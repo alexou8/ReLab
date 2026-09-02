@@ -181,19 +181,27 @@ row did not come from ReLab.
 |---|---|---|---|
 | `id` | uuid | no | PK |
 | `hostname`, `version` | text | no | |
-| `status` | text | no | `HEALTHY\|SUSPECT\|LOST` |
+| `status` | text | no | `HEALTHY\|SUSPECT\|LOST\|STOPPED` |
 | `capacity` | integer | no | `> 0` |
 | `active_tasks` | integer | no | `>= 0` |
 | `last_heartbeat` | timestamptz | no | |
 | `registered_at` | timestamptz | no | |
 
-**Index:** `(last_heartbeat) WHERE status <> 'LOST'`. Lost workers are terminal
-and never re-examined, so they are excluded.
+**Index:** `(last_heartbeat) WHERE status NOT IN ('LOST', 'STOPPED')`. Both are
+terminal and never re-examined, so they are excluded.
 
 **Lifecycle:** `HEALTHY → SUSPECT` after 3 missed heartbeats, `SUSPECT → LOST`
-after 5. `LOST` is terminal: a heartbeat from a lost worker is refused with
+after 5. A worker shutting down cleanly writes `STOPPED` itself instead
+(`engine.RetireWorker`), releasing any lease it still holds.
+
+`LOST` and `STOPPED` are both terminal: a heartbeat from either is refused with
 `engine.ErrWorkerLost`, because its leases have been handed on and letting it
 return would leave two workers believing they own the same tasks.
+
+The two are distinguished for the reader, not for the scheduler. `STOPPED` means
+the process said it was leaving; `LOST` means it did not, and is the only
+outcome available to a process that loses power. Reclamation is identical either
+way, which is why a clean shutdown is never load-bearing.
 
 ### `side_effects`
 

@@ -1,0 +1,21 @@
+# An upstream that never comes back. The retry policy absorbs a transient 503
+# (see http-error.yaml); this scenario removes the `attempt:` bound so every
+# attempt fails, and pins down what ReLab does when retrying cannot help.
+#
+# The expected outcome is a failed run, not a successful one: the task is dead-
+# lettered after its attempts are spent and the tasks downstream of it never
+# become ready. A reliability tool whose corpus only contains scenarios that end
+# well has not tested the interesting half.
+name: upstream-down-throughout
+seed: 7
+faults:
+  - type: http-error
+    target: {task: validate}
+    at: after-task-start
+    params: {status: 503}
+assert:
+  run_status: FAILED
+  # `validate` is retried to its limit and no further. Anything more would mean
+  # the attempt cap is not being enforced.
+  max_retries_per_task: 2
+  duplicate_effects: 0
