@@ -78,6 +78,12 @@ so an untidied module breaks the build.
   skill and `CLAUDE.md` disagree, `CLAUDE.md` wins. (One does: a skill says never
   to design schemas; this project's schema design is the orchestrator's job and
   is documented in `DATA.md`.)
+- `.claude/settings.json` enables the Vercel plugin from Anthropic's official
+  marketplace, for the dashboard deployment described in `docs/deployment.md`.
+  It is a declaration, not vendored code: the plugin is fetched per machine.
+  The same precedence applies — its guidance is Vercel's, and `CLAUDE.md` wins
+  where they disagree. Nothing in the Go module depends on it, and no build or
+  test does.
 
 ## Rules for modifying infrastructure
 
