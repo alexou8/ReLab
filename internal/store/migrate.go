@@ -197,3 +197,21 @@ func (db *DB) SchemaVersion(ctx context.Context) (int, error) {
 	}
 	return version, nil
 }
+
+// ExpectedSchemaVersion is the highest migration this binary carries.
+//
+// A readiness check compares it against what the database has applied. The two
+// differing means the process is talking to a database it does not understand,
+// which is a state to refuse traffic in rather than to discover one failing
+// query at a time.
+func ExpectedSchemaVersion() (int, error) {
+	migrations, err := LoadMigrations()
+	if err != nil {
+		return 0, err
+	}
+	if len(migrations) == 0 {
+		return 0, fmt.Errorf("store: the binary carries no migrations")
+	}
+	// LoadMigrations sorts by version.
+	return migrations[len(migrations)-1].Version, nil
+}

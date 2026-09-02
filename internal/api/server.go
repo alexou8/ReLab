@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -65,16 +66,49 @@ func (s *Server) health(w http.ResponseWriter, _ *http.Request) {
 }
 
 // ready reports whether the process can actually serve, which for ReLab means
-// the database is reachable. A liveness probe that only proves the HTTP server
-// is listening would keep a process in rotation that cannot do anything.
+// the database is reachable and holds the schema this binary was built for. A
+// probe that only proves the HTTP server is listening would keep a process in
+// rotation that cannot do anything.
+//
+// The two conditions are reported separately because they need different
+// responses: a database that is down comes back on its own, and a schema that
+// does not match needs someone to deploy or roll back. The reason strings say
+// which, and neither of them names a table, a query or a DSN.
 func (s *Server) ready(w http.ResponseWriter, r *http.Request) {
 	if err := s.engine.DB().Ping(r.Context()); err != nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{
-			"status": "unavailable", "reason": "database is not reachable",
-		})
+		s.notReady(w, r, "database is not reachable", err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ready"})
+
+	expected, err := store.ExpectedSchemaVersion()
+	if err != nil {
+		s.notReady(w, r, "schema version could not be determined", err)
+		return
+	}
+	applied, err := s.engine.DB().SchemaVersion(r.Context())
+	if err != nil {
+		s.notReady(w, r, "schema version could not be read", err)
+		return
+	}
+	if applied != expected {
+		// Logged with both numbers, answered with neither: an operator needs
+		// them and reads the log, and an anonymous caller learns only that this
+		// instance is not taking traffic.
+		s.notReady(w, r, "database schema does not match this build",
+			fmt.Errorf("schema is at version %d, this build expects %d", applied, expected))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status": "ready", "schema_version": applied,
+	})
+}
+
+func (s *Server) notReady(w http.ResponseWriter, r *http.Request, reason string, err error) {
+	s.log.WarnContext(r.Context(), "not ready", "reason", reason, "error", err)
+	writeJSON(w, http.StatusServiceUnavailable, map[string]string{
+		"status": "unavailable", "reason": reason,
+	})
 }
 
 func (s *Server) listWorkflows(w http.ResponseWriter, r *http.Request) {
