@@ -14,7 +14,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"syscall"
 	"testing"
@@ -220,23 +219,12 @@ func newEnv(t *testing.T) *env {
 		t.Fatalf("new engine: %v", err)
 	}
 
-	return &env{ctx: ctx, db: db, eng: eng, dsn: dsn, binary: buildBinary(t)}
+	return &env{ctx: ctx, db: db, eng: eng, dsn: dsn, binary: testsupport.BuildRelab(t)}
 }
 
 // buildBinary compiles the relab binary once per package run. The tests spawn
 // the real command, not a test harness pretending to be one, because the thing
 // under test is what happens when that exact process is killed.
-func buildBinary(t *testing.T) string {
-	t.Helper()
-	out := filepath.Join(t.TempDir(), "relab")
-	cmd := exec.CommandContext(context.Background(), "go", "build", "-o", out, "github.com/alexou8/relab/cmd/relab")
-	cmd.Env = os.Environ()
-	if output, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("build relab: %v\n%s", err, output)
-	}
-	return out
-}
-
 func (e *env) createRun(t *testing.T, yaml string) uuid.UUID {
 	t.Helper()
 	reg := sdk.NewRegistry()

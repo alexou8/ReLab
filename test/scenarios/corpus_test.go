@@ -36,16 +36,16 @@ var timingEnv = []string{
 // workflow has says so with `workflow:`.
 const defaultWorkflow = "examples/data-pipeline.yaml"
 
-// repoRoot is where paths in a scenario's `workflow:` field are resolved from,
-// so the field reads the same in a scenario file as it does on a command line.
-const repoRoot = "../.."
-
 func TestScenarioCorpus(t *testing.T) {
 	if testing.Short() {
 		t.Skip("the scenario corpus spawns processes and waits on lease expiry; skipped in -short")
 	}
 
-	files, err := filepath.Glob("../../examples/scenarios/*.yaml")
+	// Everything is resolved from the module root rather than from the test's
+	// working directory, so the suite does not depend on where it is run from.
+	repoRoot := testsupport.ModuleRoot(t)
+
+	files, err := filepath.Glob(filepath.Join(repoRoot, "examples", "scenarios", "*.yaml"))
 	if err != nil {
 		t.Fatalf("find scenarios: %v", err)
 	}
@@ -53,7 +53,7 @@ func TestScenarioCorpus(t *testing.T) {
 		t.Fatal("no scenarios found; the corpus is the regression suite and must not be empty")
 	}
 
-	binary := buildBinary(t)
+	binary := testsupport.BuildRelab(t)
 
 	for _, file := range files {
 		t.Run(strings.TrimSuffix(filepath.Base(file), ".yaml"), func(t *testing.T) {
@@ -71,6 +71,8 @@ func TestScenarioCorpus(t *testing.T) {
 					"or fails by luck is not a regression test", scenario.Name)
 			}
 
+			// A scenario's `workflow:` field is relative to the module root, so
+			// it reads the same in a file as it does on a command line.
 			workflowFile := filepath.Join(repoRoot, defaultWorkflow)
 			if scenario.Workflow != "" {
 				workflowFile = filepath.Join(repoRoot, scenario.Workflow)
@@ -138,18 +140,6 @@ func runScenario(t *testing.T, binary, dsn, scenarioFile, workflowFile string) r
 			"would not notice")
 	}
 	return r
-}
-
-func buildBinary(t *testing.T) string {
-	t.Helper()
-	out := filepath.Join(t.TempDir(), "relab")
-	cmd := exec.CommandContext(context.Background(), "go", "build", "-o", out,
-		"github.com/alexou8/relab/cmd/relab")
-	cmd.Env = os.Environ()
-	if output, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("build relab: %v\n%s", err, output)
-	}
-	return out
 }
 
 type testWriter struct{ t *testing.T }
