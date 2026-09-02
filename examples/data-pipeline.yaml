@@ -1,0 +1,18 @@
+# The workflow the README and the quick start use: a linear pipeline whose
+# steps each depend on the one before, so a failure anywhere stalls everything
+# downstream and recovery is easy to see.
+name: data-pipeline
+version: 1
+steps:
+  - name: import
+    handler: import_csv
+    retry: {max_attempts: 3, initial_delay: 1s, multiplier: 2, max_delay: 30s, jitter: 0.2}
+  - name: validate
+    handler: validate_rows
+    depends_on: [import]
+  - name: analyze
+    handler: analyze
+    depends_on: [validate]
+  - name: report
+    handler: generate_report
+    depends_on: [analyze]

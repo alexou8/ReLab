@@ -52,6 +52,9 @@ func Execute(version string) error {
 
 	root.AddCommand(
 		newMigrateCmd(g),
+		newWorkflowCmd(g),
+		newRunCmd(g),
+		newRunsCmd(g),
 	)
 
 	// A cancelled context reaches every command, so Ctrl-C stops a worker or a

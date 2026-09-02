@@ -1,0 +1,15 @@
+# Kill the worker holding `analyze` the moment its handler starts. The task is
+# recovered by lease expiry, not by the worker doing anything on the way out —
+# the process is gone. The assertions say what recovery has to look like.
+name: worker-crash-during-analyze
+seed: 42
+faults:
+  - type: worker-crash
+    target: {task: analyze}
+    at: after-task-start
+assert:
+  run_status: SUCCEEDED
+  lost_tasks: 0
+  duplicate_effects: 0
+  max_recovery_time_ms: 5000
+  max_retries_per_task: 2

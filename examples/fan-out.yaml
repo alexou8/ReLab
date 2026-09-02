@@ -1,0 +1,21 @@
+# Parallel fan-out with a fan-in barrier. The three shard steps are claimed by
+# whichever workers are free, and `merge` is scheduled only when the last of
+# them succeeds — which is what makes it the interesting case for a worker
+# crash: killing a worker mid-shard must not release the barrier early.
+name: fan-out
+version: 1
+steps:
+  - name: split
+    handler: split_input
+  - name: shard_a
+    handler: process_shard
+    depends_on: [split]
+  - name: shard_b
+    handler: process_shard
+    depends_on: [split]
+  - name: shard_c
+    handler: process_shard
+    depends_on: [split]
+  - name: merge
+    handler: merge_shards
+    depends_on: [shard_a, shard_b, shard_c]
