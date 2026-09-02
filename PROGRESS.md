@@ -75,3 +75,26 @@ attempt, with no `(task, attempt)` pair started twice.
 binary, waits until the database says it holds the running task, `SIGKILL`s that
 exact process, and asserts the run still succeeds via `TASK_LEASE_EXPIRED` and
 `TASK_REQUEUED`.
+
+## M3 — Reliability core
+
+```
+M3.1 idempotency ledger extracted, jsonb-consistent  | orchestrator | done | internal/idem
+M3.2 SIDE_EFFECT_SKIPPED emitted on suppression      | orchestrator | done | internal/engine
+M3.3 cancellation: unstarted DEAD, in-flight revoked | orchestrator | done | internal/engine
+M3.4 reaper does not restart a finished run's tasks  | orchestrator | done | internal/engine
+M3.5 step timeouts fail the attempt                  | orchestrator | done | internal/engine
+M3.6 coordinator restart resumes from the database   | orchestrator | done | internal/engine
+M3.7 `relab run cancel`                              | orchestrator | done | internal/cli
+M3.8 crash-before-ack acceptance test                | orchestrator | done | test/process
+M3.9 decision 0005: what the ledger guarantees       | orchestrator | done | docs/decisions
+```
+
+Retry backoff (`internal/retry`) and the dead-letter queue landed in M1, where
+recording a failure first needed them.
+
+**Acceptance:** `TestEffectSurvivesACrashBeforeAcknowledgement` runs a handler
+that performs a recorded side effect and then `SIGKILL`s its own process before
+the outcome can be acknowledged. The task is recovered by lease expiry and
+retried; the ledger holds exactly one effect, the journal carries
+`SIDE_EFFECT_SKIPPED`, and the recorded result is still the first attempt's.

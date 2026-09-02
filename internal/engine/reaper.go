@@ -92,6 +92,20 @@ func (e *Engine) expireLeases(ctx context.Context) (expired, requeued, dead int,
 			if err := e.recordLeaseExpiry(ctx, tx, task, now); err != nil {
 				return err
 			}
+			// A cancelled run's in-flight tasks have their leases expired by
+			// CancelRun. Requeueing them would restart work the operator asked
+			// to stop, so they end here instead.
+			finished, err := e.runIsTerminal(ctx, tx, task.RunID)
+			if err != nil {
+				return err
+			}
+			if finished {
+				if err := e.abandonExpired(ctx, tx, task, "run is no longer active", now); err != nil {
+					return err
+				}
+				dead++
+				continue
+			}
 			def, err := e.definitionForRun(ctx, tx, task.RunID)
 			if err != nil {
 				return err
@@ -346,4 +360,34 @@ func (e *Engine) RenewLease(ctx context.Context, workerID uuid.UUID, taskIDs []u
 		return nil, fmt.Errorf("engine: renew leases for worker %s: %w", workerID, store.Classify(err))
 	}
 	return renewed, nil
+}
+
+// runIsTerminal reports whether a run has already finished, so the reaper does
+// not restart work belonging to one that was cancelled or closed.
+func (e *Engine) runIsTerminal(ctx context.Context, tx store.Conn, runID uuid.UUID) (bool, error) {
+	var status RunStatus
+	if err := tx.QueryRow(ctx, `SELECT status FROM runs WHERE id = $1`, runID).Scan(&status); err != nil {
+		return false, fmt.Errorf("read run %s: %w", runID, store.Classify(err))
+	}
+	return status.Terminal(), nil
+}
+
+// abandonExpired ends a task whose run is no longer active, without the
+// dead-letter bookkeeping a genuine failure gets: the task did not fail, it was
+// stopped.
+func (e *Engine) abandonExpired(ctx context.Context, tx store.Conn, task Task,
+	reason string, now time.Time) error {
+	if _, err := tx.Exec(ctx, `
+		UPDATE tasks
+		SET status = 'DEAD', worker_id = NULL, lease_expires_at = NULL,
+		    completed_at = $1, updated_at = $1, error = coalesce(error, $2)
+		WHERE id = $3 AND status IN ('LEASED', 'RUNNING')`,
+		now, reason, task.ID); err != nil {
+		return fmt.Errorf("abandon task %s: %w", task.Name, err)
+	}
+	_, err := event.Append(ctx, tx, task.RunID, event.TaskDeadLetteredPayload{
+		Attempts: task.Attempt,
+		Reason:   reason,
+	}, event.Meta{TaskName: task.Name, OccurredAt: now})
+	return err
 }

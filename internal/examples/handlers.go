@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"syscall"
 	"time"
 
 	"github.com/alexou8/relab/sdk"
@@ -30,6 +31,7 @@ func Register(reg *sdk.Registry) error {
 		"merge_shards":    mergeShards,
 		"slow_step":       slowStep,
 		"summarize":       summarize,
+		"effect_then_die": effectThenDie,
 	}
 	for name, h := range handlers {
 		if err := reg.Handle(name, h); err != nil {
@@ -75,6 +77,37 @@ func slowStep(ctx context.Context, tc *sdk.TaskContext) (any, error) {
 	case <-timer.C:
 	}
 	return map[string]any{"slept_ms": d.Milliseconds(), "attempt": tc.Attempt}, nil
+}
+
+// effectThenDie performs one recorded side effect and then kills its own
+// process, before the outcome can be acknowledged.
+//
+// It exists for the idempotency acceptance test, which needs the crash to land
+// in the one window that cannot be closed by any amount of care: after the
+// effect is recorded and before the task is marked done. Nothing else can
+// produce that timing reliably. On the retry the effect is suppressed by the
+// ledger and the handler returns normally, which is what the test asserts.
+//
+// It only arms itself when RELAB_EFFECT_THEN_DIE is set, so it is inert in the
+// shipped binary and in the compose demo.
+func effectThenDie(ctx context.Context, tc *sdk.TaskContext) (any, error) {
+	result, err := tc.Do(ctx, "external-charge", func(context.Context) (any, error) {
+		return map[string]any{"charged": true, "by_attempt": tc.Attempt}, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if os.Getenv("RELAB_EFFECT_THEN_DIE") != "" && tc.Attempt == 1 {
+		// SIGKILL to this process: no deferred function runs, no outcome is
+		// recorded, and the task can only come back through lease expiry.
+		if err := syscall.Kill(os.Getpid(), syscall.SIGKILL); err != nil {
+			return nil, fmt.Errorf("failed to kill own process for the test: %w", err)
+		}
+		// Unreachable in practice; kept so the function has an honest return.
+		return nil, fmt.Errorf("process did not die")
+	}
+	return map[string]any{"effect": result, "attempt": tc.Attempt}, nil
 }
 
 // summarize reads whatever its dependencies produced, whatever they are called.

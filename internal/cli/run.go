@@ -94,7 +94,7 @@ func newRunCmd(g *global) *cobra.Command {
 	// `run inspect <id>` rather than a top-level `inspect`: cobra matches a
 	// subcommand name before falling through to the parent's positional
 	// argument, so `relab run examples/data-pipeline.yaml` still works.
-	cmd.AddCommand(newRunInspectCmd(g))
+	cmd.AddCommand(newRunInspectCmd(g), newRunCancelCmd(g))
 	return cmd
 }
 
@@ -344,4 +344,41 @@ func scenarioIdentity(path string) (name, hash string, err error) {
 		return "", "", err
 	}
 	return sc.Name, sc.Hash, nil
+}
+
+func newRunCancelCmd(g *global) *cobra.Command {
+	var reason string
+	cmd := &cobra.Command{
+		Use:   "cancel <run-id>",
+		Short: "Stop a run and everything in it that has not finished",
+		Long: "Unstarted tasks end immediately. A task already executing on a worker is not\n" +
+			"interrupted from here — the coordinator has no channel to a worker's goroutine,\n" +
+			"and one would only work while the worker was reachable. Its lease is expired\n" +
+			"instead, so the worker finds out the same way it finds out about any other loss\n" +
+			"of ownership, and its result is discarded.",
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
+			runID, err := uuid.Parse(args[0])
+			if err != nil {
+				return fmt.Errorf("%q is not a run id: %w", args[0], err)
+			}
+			db, err := g.openDB(ctx)
+			if err != nil {
+				return err
+			}
+			defer db.Close()
+			eng, err := engine.New(db, engine.Options{})
+			if err != nil {
+				return err
+			}
+			if err := eng.CancelRun(ctx, runID, reason); err != nil {
+				return err
+			}
+			cmd.Printf("cancelled run %s\n", runID)
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&reason, "reason", "cancelled by operator", "reason recorded in the run's journal")
+	return cmd
 }

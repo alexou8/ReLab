@@ -11,7 +11,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/alexou8/relab/internal/store"
+	"github.com/alexou8/relab/internal/idem"
 	"github.com/alexou8/relab/sdk"
 )
 
@@ -159,94 +159,32 @@ func marshalOutput(result any) (json.RawMessage, error) {
 	return raw, nil
 }
 
-// ledger is the sdk.EffectLedger backed by the side_effects table.
+// ledger adapts idem.Ledger to sdk.EffectLedger, adding the one thing the SDK
+// interface cannot know about: emitting SIDE_EFFECT_SKIPPED when a repeat is
+// suppressed. The ledger itself has no opinion about events.
 type ledger struct {
 	engine   *Engine
+	inner    *idem.Ledger
 	task     Task
 	workerID uuid.UUID
 }
 
 func newLedger(e *Engine, task Task, workerID uuid.UUID) *ledger {
-	return &ledger{engine: e, task: task, workerID: workerID}
+	return &ledger{engine: e, inner: idem.New(e.db), task: task, workerID: workerID}
 }
 
-// Do performs fn at most once per key across every attempt of a task.
-//
-// The recorded result is looked up first. If nothing is recorded, fn runs and
-// its result is inserted; a concurrent attempt that inserted first wins the
-// unique constraint and this call returns that attempt's result instead of its
-// own. The effect itself can still happen twice in that window — this is
-// at-least-once delivery, and the ledger bounds the damage rather than
-// eliminating it. `docs/reliability.md` states exactly what that means.
+// Do performs fn at most once per key across every attempt of a task, and
+// records the suppression of a repeat in the run's journal.
 func (l *ledger) Do(ctx context.Context, key string,
 	fn func(context.Context) (any, error)) (json.RawMessage, bool, error) {
-	recorded, found, err := l.lookup(ctx, key)
+	result, skipped, err := l.inner.Do(ctx, idem.Key(key), l.task.RunID, l.task.Name, fn)
 	if err != nil {
 		return nil, false, err
 	}
-	if found {
-		if err := l.recordSkip(ctx, key); err != nil {
+	if skipped {
+		if err := l.engine.appendSideEffectSkipped(ctx, l.task, key); err != nil {
 			return nil, false, err
 		}
-		return recorded, true, nil
 	}
-
-	result, err := fn(ctx)
-	if err != nil {
-		return nil, false, err
-	}
-	raw, err := json.Marshal(result)
-	if err != nil {
-		return nil, false, fmt.Errorf("engine: side effect %q returned a non-serialisable result: %w", key, err)
-	}
-
-	inserted, err := l.insert(ctx, key, raw)
-	if err != nil {
-		return nil, false, err
-	}
-	if !inserted {
-		// Another attempt recorded this effect while ours was running. Return
-		// what it recorded so both attempts agree on the result.
-		recorded, _, err := l.lookup(ctx, key)
-		if err != nil {
-			return nil, false, err
-		}
-		if err := l.recordSkip(ctx, key); err != nil {
-			return nil, false, err
-		}
-		return recorded, true, nil
-	}
-	return raw, false, nil
-}
-
-func (l *ledger) lookup(ctx context.Context, key string) (json.RawMessage, bool, error) {
-	var raw json.RawMessage
-	err := l.engine.db.Conn().QueryRow(ctx,
-		`SELECT result FROM side_effects WHERE idempotency_key = $1`, key).Scan(&raw)
-	if err != nil {
-		if errors.Is(store.Classify(err), store.ErrNotFound) {
-			return nil, false, nil
-		}
-		return nil, false, fmt.Errorf("engine: read side effect %q: %w", key, store.Classify(err))
-	}
-	return raw, true, nil
-}
-
-func (l *ledger) insert(ctx context.Context, key string, raw json.RawMessage) (bool, error) {
-	tag, err := l.engine.db.Conn().Exec(ctx, `
-		INSERT INTO side_effects (idempotency_key, run_id, task_name, result)
-		VALUES ($1, $2, $3, $4)
-		ON CONFLICT (idempotency_key) DO NOTHING`,
-		key, l.task.RunID, l.task.Name, raw)
-	if err != nil {
-		return false, fmt.Errorf("engine: record side effect %q: %w", key, store.Classify(err))
-	}
-	return tag.RowsAffected() == 1, nil
-}
-
-// recordSkip writes the SIDE_EFFECT_SKIPPED event that proves a retry did not
-// become a duplicate effect. It is the observable evidence the reliability
-// assertions check.
-func (l *ledger) recordSkip(ctx context.Context, key string) error {
-	return l.engine.appendSideEffectSkipped(ctx, l.task, key)
+	return result, skipped, nil
 }

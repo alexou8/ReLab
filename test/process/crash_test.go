@@ -260,6 +260,13 @@ func (e *env) createRun(t *testing.T, yaml string) uuid.UUID {
 // startWorker spawns a real worker process and registers its cleanup.
 func (e *env) startWorker(t *testing.T, name string) *workerProc {
 	t.Helper()
+	return e.startWorkerWith(t, name, nil)
+}
+
+// startWorkerWith spawns a worker with extra environment, for the tests that
+// arm a handler to misbehave.
+func (e *env) startWorkerWith(t *testing.T, name string, extra map[string]string) *workerProc {
+	t.Helper()
 	hostname := name + "-" + uuid.NewString()[:8]
 
 	// The command is deliberately not bound to the test context: these tests
@@ -275,6 +282,9 @@ func (e *env) startWorker(t *testing.T, name string) *workerProc {
 		"RELAB_LOG_LEVEL=warn",
 	)
 	for k, v := range fastTiming {
+		cmd.Env = append(cmd.Env, k+"="+v)
+	}
+	for k, v := range extra {
 		cmd.Env = append(cmd.Env, k+"="+v)
 	}
 	cmd.Stdout = &prefixWriter{t: t, prefix: name}

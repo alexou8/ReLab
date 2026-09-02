@@ -1,0 +1,12 @@
+# The workflow behind the idempotency acceptance test: a step that performs one
+# recorded side effect and then kills its own process before the outcome can be
+# acknowledged. The retry must find the effect already recorded and skip it.
+name: idempotent-effect
+version: 1
+steps:
+  - name: charge
+    handler: effect_then_die
+    retry: {max_attempts: 3, initial_delay: 100ms, multiplier: 2, max_delay: 1s, jitter: 0}
+  - name: confirm
+    handler: summarize
+    depends_on: [charge]
