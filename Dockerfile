@@ -1,7 +1,7 @@
 # Build and run the single relab binary. The image is the same for the control
 # plane and the workers; the command decides which one it is.
 
-FROM golang:1.23-alpine AS build
+FROM golang:1.25-alpine AS build
 WORKDIR /src
 
 # Dependencies are copied and downloaded first so that a source-only change

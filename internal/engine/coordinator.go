@@ -4,6 +4,8 @@ import (
 	"context"
 	"log/slog"
 	"time"
+
+	"github.com/alexou8/relab/internal/telemetry"
 )
 
 // Coordinator runs the recovery sweep on a timer.
@@ -51,6 +53,13 @@ func (c *Coordinator) Run(ctx context.Context) error {
 				c.log.ErrorContext(ctx, "reaper sweep failed", "error", err)
 				continue
 			}
+			metrics, _ := telemetry.Meter()
+			metrics.RecordLeaseExpiration(ctx, int64(result.LeasesExpired))
+			metrics.RecordWorkersLost(ctx, int64(result.WorkersLost))
+			if depth, err := c.engine.QueueDepth(ctx); err == nil {
+				metrics.RecordQueueDepth(ctx, int64(depth))
+			}
+
 			if result.Empty() {
 				continue
 			}

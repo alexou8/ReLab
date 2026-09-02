@@ -117,3 +117,14 @@ func (e *Engine) RunProgress(ctx context.Context, runID uuid.UUID) (Progress, er
 	}
 	return p, nil
 }
+
+// QueueDepth returns how many tasks are runnable or waiting on a retry, which
+// is the number that says whether the pool is keeping up.
+func (e *Engine) QueueDepth(ctx context.Context) (int, error) {
+	var depth int
+	if err := e.db.Conn().QueryRow(ctx, `
+		SELECT count(*) FROM tasks WHERE status IN ('READY', 'RETRYING')`).Scan(&depth); err != nil {
+		return 0, fmt.Errorf("engine: read queue depth: %w", store.Classify(err))
+	}
+	return depth, nil
+}

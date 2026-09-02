@@ -5,6 +5,8 @@
 #   docker compose exec api relab run /examples/data-pipeline.yaml
 #   docker compose kill worker-2      # while a run is in flight
 #   docker compose exec api relab run inspect <run-id>
+#
+# The dashboard is at http://localhost:3000 and the API at http://localhost:8080.
 
 x-relab-env: &relab-env
   RELAB_DSN: postgres://relab:relab@postgres:5432/relab?sslmode=disable
@@ -74,6 +76,19 @@ services:
 
   worker-3:
     <<: *worker
+
+  # The dashboard is a debugging surface, not the product. It is read-only and
+  # renders on the server, so it holds no credential and cannot change anything.
+  dashboard:
+    build:
+      context: ./web
+    environment:
+      RELAB_API_URL: http://api:8080
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
 
 volumes:
   pgdata:

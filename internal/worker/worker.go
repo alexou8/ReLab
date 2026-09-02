@@ -12,6 +12,7 @@ import (
 
 	"github.com/alexou8/relab/internal/config"
 	"github.com/alexou8/relab/internal/engine"
+	"github.com/alexou8/relab/internal/telemetry"
 	"github.com/alexou8/relab/sdk"
 )
 
@@ -211,8 +212,12 @@ func (w *Worker) execute(ctx context.Context, task engine.ClaimedTask) {
 			log.WarnContext(execCtx, "lease lost, discarding result")
 		case errors.Is(err, engine.ErrConcurrentAttempt):
 			// Two workers on one attempt is a scheduler bug, not a transient
-			// condition. It is logged at error level so it cannot be missed.
+			// condition. It is logged at error level and counted, so it cannot
+			// be missed: duplicate_executions_total should always be zero, and
+			// a non-zero value means something is wrong rather than busy.
 			log.ErrorContext(execCtx, "another worker is executing this attempt", "error", err)
+			metrics, _ := telemetry.Meter()
+			metrics.RecordDuplicateExecution(execCtx, task.Task.Name)
 		default:
 			log.ErrorContext(execCtx, "failed to record task outcome", "error", err)
 		}

@@ -11,7 +11,12 @@ import (
 
 	"github.com/google/uuid"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/alexou8/relab/internal/idem"
+	"github.com/alexou8/relab/internal/telemetry"
 	"github.com/alexou8/relab/sdk"
 )
 
@@ -99,6 +104,22 @@ func (x *Executor) trigger(ctx context.Context, runID uuid.UUID, point, taskName
 // data the system is designed to handle, and returning it here would make every
 // caller re-implement the distinction.
 func (x *Executor) Execute(ctx context.Context, claimed ClaimedTask) error {
+	// One span per attempt, carrying the identifiers that also appear on every
+	// log line the attempt produces. A reader who finds a failure in the logs
+	// can follow trace_id here, and vice versa.
+	ctx, span := telemetry.Tracer().Start(ctx, "task.execute",
+		trace.WithSpanKind(trace.SpanKindConsumer),
+		trace.WithAttributes(
+			attribute.String("relab.run_id", claimed.RunID.String()),
+			attribute.String("relab.task_id", claimed.Task.ID.String()),
+			attribute.String("relab.task", claimed.Task.Name),
+			attribute.String("relab.workflow", claimed.WorkflowName),
+			attribute.String("relab.worker_id", x.workerID.String()),
+			attribute.String("relab.handler", claimed.Handler),
+			attribute.Int("relab.attempt", claimed.Task.Attempt),
+		))
+	defer span.End()
+
 	handler, ok := x.registry.Lookup(claimed.Handler)
 	if !ok {
 		// The workflow was registered against a registry that had this handler
@@ -141,6 +162,7 @@ func (x *Executor) Execute(ctx context.Context, claimed ClaimedTask) error {
 		x.workerID, claimed.Inputs, ledger)
 
 	outcome := x.invoke(ctx, handler, tc, claimed)
+	x.recordOutcome(ctx, span, claimed, outcome)
 
 	// before-task-ack fires after the handler returned and before the outcome
 	// is recorded — the window the idempotency ledger exists for. A crash here
@@ -273,6 +295,41 @@ func (l *ledger) Do(ctx context.Context, key string,
 		if err := l.engine.appendSideEffectSkipped(ctx, l.task, key); err != nil {
 			return nil, false, err
 		}
+		metrics, _ := telemetry.Meter()
+		metrics.RecordSideEffectSkipped(ctx, l.task.Name)
 	}
 	return result, skipped, nil
+}
+
+// recordOutcome annotates the span and records the metrics for one attempt.
+//
+// A failed handler marks the span as an error, because that is what a trace
+// backend uses to surface it. ErrLeaseLost is deliberately not an error on the
+// span: losing a lease is the system working as designed, and marking it red
+// would train readers to ignore red spans.
+func (x *Executor) recordOutcome(ctx context.Context, span trace.Span,
+	claimed ClaimedTask, outcome Outcome) {
+	metrics, err := telemetry.Meter()
+	if err != nil {
+		// Telemetry setup failing must not stop work; it is diagnostic. The
+		// recording methods are nil-safe, so nothing below needs a guard.
+		metrics = nil
+	}
+
+	status := "succeeded"
+	if outcome.Err != nil {
+		status = "failed"
+		span.SetStatus(codes.Error, truncateError(outcome.Err.Error()))
+		span.RecordError(outcome.Err)
+		span.SetAttributes(attribute.Bool("relab.permanent", outcome.Permanent))
+	} else {
+		span.SetStatus(codes.Ok, "")
+	}
+	span.SetAttributes(
+		attribute.Int64("relab.duration_ms", outcome.Duration.Milliseconds()),
+		attribute.Int("relab.artifacts", len(outcome.Artifacts)),
+	)
+
+	metrics.RecordTaskExecution(ctx, status, claimed.WorkflowName,
+		claimed.Task.Name, outcome.Duration.Seconds())
 }

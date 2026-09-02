@@ -1,11 +1,10 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
-	"os"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
@@ -14,6 +13,7 @@ import (
 	"github.com/alexou8/relab/internal/engine"
 	"github.com/alexou8/relab/internal/fault"
 	"github.com/alexou8/relab/internal/faultengine"
+	"github.com/alexou8/relab/internal/telemetry"
 	"github.com/alexou8/relab/internal/worker"
 )
 
@@ -29,6 +29,12 @@ func newServerCmd(g *global, version string) *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
 			log := newLogger()
+
+			// Telemetry is diagnostic; the workflows are the job. A control
+			// plane that refuses to start because it could not reach a
+			// collector would turn an observability problem into an outage.
+			providers := setupTelemetry(ctx, log, "control-plane", version)
+			defer shutdownTelemetry(ctx, log, providers)
 
 			db, err := g.openDB(ctx)
 			if err != nil {
@@ -76,6 +82,9 @@ func newWorkerCmd(g *global, version string) *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
 			log := newLogger()
+
+			providers := setupTelemetry(ctx, log, "worker", version)
+			defer shutdownTelemetry(ctx, log, providers)
 
 			db, err := g.openDB(ctx)
 			if err != nil {
@@ -176,22 +185,32 @@ func newWorkersCmd(g *global) *cobra.Command {
 
 // newLogger builds the structured logger the long-running commands use.
 //
-// Text by default because a human is usually watching a local worker; JSON when
-// asked, because a deployed one is usually being scraped. Every line carries
-// the run and task ids, so a failure can be followed across processes.
+// It goes through telemetry so every line logged inside a span carries the
+// trace_id, which is what lets a reader move between a log and a trace when
+// several runs are in flight.
 func newLogger() *slog.Logger {
-	level := slog.LevelInfo
-	switch strings.ToLower(config.String(config.EnvLogLevel, "info")) {
-	case "debug":
-		level = slog.LevelDebug
-	case "warn":
-		level = slog.LevelWarn
-	case "error":
-		level = slog.LevelError
+	return telemetry.NewLogger(
+		config.String(config.EnvLogLevel, "info"),
+		config.String(config.EnvLogFormat, "text"))
+}
+
+// setupTelemetry installs the trace and metric providers, reporting a failure
+// rather than propagating it.
+//
+// A process that cannot export telemetry can still run workflows correctly, and
+// the instruments are nil-safe throughout, so refusing to start would trade a
+// missing graph for an outage.
+func setupTelemetry(ctx context.Context, log *slog.Logger, component, version string) *telemetry.Providers {
+	providers, err := telemetry.Setup(ctx, telemetry.ConfigFromEnv(component, version))
+	if err != nil {
+		log.WarnContext(ctx, "telemetry is disabled: setup failed", "error", err)
+		return nil
 	}
-	opts := &slog.HandlerOptions{Level: level}
-	if strings.EqualFold(config.String(config.EnvLogFormat, "text"), "json") {
-		return slog.New(slog.NewJSONHandler(os.Stderr, opts))
+	return providers
+}
+
+func shutdownTelemetry(ctx context.Context, log *slog.Logger, providers *telemetry.Providers) {
+	if err := providers.Shutdown(ctx); err != nil {
+		log.WarnContext(ctx, "telemetry shutdown", "error", err)
 	}
-	return slog.New(slog.NewTextHandler(os.Stderr, opts))
 }

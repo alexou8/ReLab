@@ -12,6 +12,7 @@ import (
 	"github.com/alexou8/relab/internal/event"
 	"github.com/alexou8/relab/internal/retry"
 	"github.com/alexou8/relab/internal/store"
+	"github.com/alexou8/relab/internal/telemetry"
 	"github.com/alexou8/relab/internal/workflow"
 )
 
@@ -116,7 +117,7 @@ func (e *Engine) recordFailure(ctx context.Context, tx store.Conn, workerID uuid
 	}
 
 	if willRetry {
-		return e.scheduleRetry(ctx, tx, task, policy, now)
+		return e.scheduleRetry(ctx, tx, task, policy, def.Name, now)
 	}
 	reason := "attempts exhausted"
 	if outcome.Permanent {
@@ -136,7 +137,7 @@ func (e *Engine) recordFailure(ctx context.Context, tx store.Conn, workerID uuid
 // enforced by the same sweep that enforces lease expiry rather than by a timer
 // in a process that might not survive the wait.
 func (e *Engine) scheduleRetry(ctx context.Context, tx store.Conn, task Task,
-	policy retry.Policy, now time.Time) error {
+	policy retry.Policy, workflowName string, now time.Time) error {
 	rng, err := e.runRNG(ctx, tx, task.RunID, "retry-jitter", task.Name, strconv.Itoa(task.Attempt))
 	if err != nil {
 		return err
@@ -154,6 +155,9 @@ func (e *Engine) scheduleRetry(ctx context.Context, tx store.Conn, task Task,
 		WHERE id = $3 AND status = 'FAILED'`, runAt, now, task.ID); err != nil {
 		return fmt.Errorf("schedule retry: %w", err)
 	}
+	metrics, _ := telemetry.Meter()
+	metrics.RecordRetry(ctx, workflowName, task.Name)
+
 	_, err = event.Append(ctx, tx, task.RunID, event.TaskRetryScheduledPayload{
 		Attempt:     task.Attempt,
 		NextAttempt: task.Attempt + 1,
@@ -329,6 +333,7 @@ func (e *Engine) settleRun(ctx context.Context, tx store.Conn, runID uuid.UUID, 
 	if _, err := event.Append(ctx, tx, runID, payload, event.Meta{OccurredAt: now}); err != nil {
 		return err
 	}
+	e.recordRunFinished(ctx, tx, runID, status, now)
 	if _, err := tx.Exec(ctx, `
 		UPDATE runs SET status = $1, completed_at = $2, failure_reason = $3 WHERE id = $4`,
 		string(status), now, nullString(reason), runID); err != nil {
@@ -434,4 +439,28 @@ func (e *Engine) appendSideEffectSkipped(ctx context.Context, task Task, key str
 		return fmt.Errorf("engine: record skipped side effect for task %s: %w", task.Name, err)
 	}
 	return nil
+}
+
+// recordRunFinished emits the run-level metrics.
+//
+// It reads the run's own timestamps rather than measuring elapsed time in this
+// process: the run may have been created by one process and finished by
+// another, and a duration measured here would be the settling transaction's,
+// not the run's.
+func (e *Engine) recordRunFinished(ctx context.Context, tx store.Conn, runID uuid.UUID,
+	status RunStatus, now time.Time) {
+	metrics, err := telemetry.Meter()
+	if err != nil || metrics == nil {
+		return
+	}
+	var createdAt time.Time
+	var workflowName string
+	if err := tx.QueryRow(ctx, `
+		SELECT r.created_at, w.name
+		FROM runs r JOIN workflows w ON w.id = r.workflow_id
+		WHERE r.id = $1`, runID).Scan(&createdAt, &workflowName); err != nil {
+		// A metric is not worth failing the transaction that closes a run.
+		return
+	}
+	metrics.RecordRun(ctx, string(status), workflowName, now.Sub(createdAt).Seconds())
 }
