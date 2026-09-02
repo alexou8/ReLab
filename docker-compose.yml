@@ -83,6 +83,10 @@ services:
     build:
       context: ./web
     environment:
+      # Set, so the compose dashboard reads the live control plane. Unset, it
+      # would serve the recorded demo instead — which is what the deployed
+      # dashboard does, and what `docker compose run` reproduces if you want to
+      # see that version.
       RELAB_API_URL: http://api:8080
     ports:
       - "3000:3000"

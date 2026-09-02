@@ -205,7 +205,41 @@ document.
 
 The API sets `X-Content-Type-Options: nosniff`. It does not set CSP, HSTS or
 frame options, because it serves JSON to programs rather than HTML to browsers.
-The dashboard, if exposed, should be behind a proxy that sets them.
+
+The dashboard does set them, in `web/vercel.json`: `nosniff`,
+`Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`, and a CSP naming no
+external origin, which it can afford because it loads nothing from one. HSTS is
+Vercel's, and applies to every response it serves.
+
+## The public dashboard deployment
+
+The deployed dashboard is read-only in three independent ways, which is the
+reason it is safe to expose and a promise in one place would not be:
+
+1. **The API has no mutating route.** There is no POST, PUT, PATCH or DELETE
+   handler to reach. `TestTheAPIRefusesEveryWrite` fails if one is added.
+2. **The dashboard has no write path.** It fetches during server rendering and
+   emits HTML; there is no client-side mutation to disable.
+3. **With `RELAB_API_URL` unset it has no backend at all**, and serves a
+   recorded export instead. That is the default and the intended public
+   deployment.
+
+A visitor therefore cannot start a run, cancel one, kill a worker, inject a
+fault, register a workflow, or reach the database. Everything that changes
+ReLab's state is a CLI verb that needs a DSN.
+
+`RELAB_API_URL` is read on the server and is never prefixed `NEXT_PUBLIC_`, so
+it is not inlined into the client bundle. The browser never learns the API's
+address and never issues a request to it. There is no other configuration and no
+secret in the deployment, because the API has no credential to hold — which is
+also the reason a live control plane behind that variable must not be publicly
+reachable. See `docs/deployment.md` §7.
+
+The recording is an export of runs from a scratch database created by
+`scripts/record-demo.sh`. It contains workflow definitions, event payloads and
+handler output from the shipped examples, and nothing else. Regenerate it
+against a database that holds anything you would not publish, and you will
+publish it.
 
 ## Environment and deployment security
 
@@ -259,7 +293,16 @@ Stated plainly, in the order they would matter:
    deployment accumulates whatever handlers put in it. Mitigation: delete old
    runs.
 5. **No dependency scanning in CI.** A vulnerable dependency would not be caught
-   automatically. Mitigation: run `govulncheck` before releasing.
+   automatically. Mitigation: run `govulncheck` and `npm audit` before
+   releasing.
+6. **The dashboard carries a build-time `postcss` advisory** that cannot be
+   resolved without moving `next` outside its supported range. It is reachable
+   only by a source map in CSS this repository writes itself, not by anything a
+   visitor sends. Mitigation: it clears when Next ships a release that bumps it.
+7. **The recording is whatever the export contained.** It is checked into the
+   repository and served publicly, so anything in the database it was made from
+   is public. Mitigation: record against a scratch database, which is what
+   `scripts/record-demo.sh` documents.
 6. **OTLP is insecure by default.** Traces could be read on a hostile network.
    Mitigation: keep the collector local.
 

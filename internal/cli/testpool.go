@@ -171,6 +171,26 @@ func (p *workerPool) stop() {
 	}
 	p.mu.Unlock()
 
+	// SIGTERM first, so the workers take the shutdown path a deployment's
+	// workers take: they record themselves STOPPED rather than being swept up
+	// as LOST several heartbeats later. The pool is only stopped once the run
+	// is already terminal, so there is nothing left for them to finish.
+	//
+	// SIGKILL follows for anything still alive. A worker that will not leave
+	// must not hold up the suite, and the LOST path is the one that recovers it
+	// — which is the path a scenario that kills a worker is testing anyway.
+	for _, cmd := range procs {
+		if cmd.Process != nil {
+			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM)
+		}
+	}
+	drained := make(chan struct{})
+	go func() { defer close(drained); p.wg.Wait() }()
+	select {
+	case <-drained:
+		return
+	case <-time.After(gracefulStopTimeout):
+	}
 	for _, cmd := range procs {
 		if cmd.Process != nil {
 			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
@@ -178,6 +198,10 @@ func (p *workerPool) stop() {
 	}
 	p.wg.Wait()
 }
+
+// gracefulStopTimeout is how long the pool waits for its workers to leave on
+// their own before it stops asking.
+const gracefulStopTimeout = 3 * time.Second
 
 // waitForRun polls until the run reaches a terminal state or the context ends.
 func waitForRun(ctx context.Context, eng *engine.Engine, runID uuid.UUID) (engine.Run, error) {

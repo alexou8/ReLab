@@ -53,6 +53,10 @@ type Worker struct {
 	held map[uuid.UUID]context.CancelFunc
 }
 
+// retireTimeout bounds the one write a stopping worker makes. A shutdown that
+// hangs on the database is worse than one that leaves the reaper to notice.
+const retireTimeout = 5 * time.Second
+
 // New registers a worker and returns it ready to run.
 func New(ctx context.Context, eng *engine.Engine, reg *sdk.Registry, opts Options) (*Worker, error) {
 	if opts.Concurrency <= 0 {
@@ -122,6 +126,18 @@ func (w *Worker) Run(ctx context.Context) error {
 
 	err := w.claimLoop(ctx)
 	wg.Wait()
+
+	// The shutdown context is already cancelled by the time this runs — that is
+	// what ended the loop — so retiring gets a fresh one with a short deadline.
+	// It is best-effort by design: if the process is being killed rather than
+	// asked to stop, the reaper's LOST path is the one that runs, and that is
+	// the path that has to work anyway.
+	stopping, cancel := context.WithTimeout(context.WithoutCancel(ctx), retireTimeout)
+	defer cancel()
+	if retireErr := w.engine.RetireWorker(stopping, w.id); retireErr != nil {
+		w.log.WarnContext(stopping, "could not record clean shutdown; "+
+			"the reaper will declare this worker lost instead", "error", retireErr)
+	}
 
 	w.log.InfoContext(context.WithoutCancel(ctx), "worker stopped")
 	return err

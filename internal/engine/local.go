@@ -43,6 +43,7 @@ func (e *Engine) DriveWithFaults(ctx context.Context, runID uuid.UUID, reg *sdk.
 	if err != nil {
 		return err
 	}
+	defer runner.Close(ctx)
 	runner.executor = runner.executor.WithFaults(faults)
 	if _, err := runner.Run(ctx, runID); err != nil {
 		return err
@@ -74,6 +75,22 @@ func NewLocalRunner(ctx context.Context, e *Engine, reg *sdk.Registry, log *slog
 
 // WorkerID returns the identity this runner claims tasks as.
 func (r *LocalRunner) WorkerID() uuid.UUID { return r.workerID }
+
+// Close retires the runner's worker.
+//
+// Without it every `relab run` left behind a worker row that the reaper would
+// declare LOST some seconds later, so a table meant to show which workers had
+// died filled up with processes that had simply finished. It is best-effort:
+// the caller has its answer already, and a runner whose process is killed
+// leaves the same row the reaper has always handled.
+func (r *LocalRunner) Close(ctx context.Context) {
+	stopping, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	if err := r.engine.RetireWorker(stopping, r.workerID); err != nil {
+		r.log.WarnContext(stopping, "could not retire the in-process worker; "+
+			"the reaper will declare it lost instead", "worker_id", r.workerID, "error", err)
+	}
+}
 
 // Run drives a run until it reaches a terminal state, and returns it.
 //

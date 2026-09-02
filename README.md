@@ -12,6 +12,12 @@ versioned workflow code. What it has is a way to kill a worker mid-task and get
 a machine-checkable answer to "did that actually recover, and did it cost a
 duplicate side effect?"
 
+**Try it without installing anything:** the dashboard deploys on its own and
+serves a recording of five real runs — two of them with a worker killed by
+`SIGKILL` mid-task — labelled as a recording on every page. `docs/deployment.md`
+§3 is the whole setup. The recording is made by `scripts/record-demo.sh`, so it
+is an export of what actually happened rather than a fixture.
+
 ---
 
 ## The problem
@@ -243,6 +249,7 @@ relab bench <workflow> --workers N --fault-rate P --runs M
 
 relab workers                                # liveness
 relab migrate
+relab export [run-id...]                     # JSON snapshot in the read API's shapes
 ```
 
 Every command takes `--json`.
@@ -402,6 +409,23 @@ several processes cannot race the same DDL. Containers run as non-root.
 The stack is PostgreSQL, one control plane, N workers, and optionally the
 dashboard. Configuration is environment variables; there is no config file.
 
+The dashboard is a Next.js app that renders on the server and deploys to Vercel
+from `web/`. The workers do not and cannot go there: a ReLab worker holds a
+lease, renews it on a timer and executes a task that may take minutes, and
+reshaping that into a request handler would delete the thing being tested. They
+run wherever long-lived containers run.
+
+With `RELAB_API_URL` unset the dashboard needs no backend at all — it serves the
+recording. With it set, every page reads that control plane, on the server, so
+the browser never talks to the API and never sees the URL.
+
+**The API has no authentication.** Reachability is the entire access control, so
+a publicly reachable control plane is a publicly readable one. Deploy it on a
+private network or accept that.
+
+Full detail, including health checks, migration and rollback, production timings
+and the residual risks: [`docs/deployment.md`](docs/deployment.md).
+
 ---
 
 ## Roadmap
@@ -428,3 +452,4 @@ dashboard. Configuration is environment variables; there is no config file.
 | [`AGENTS.md`](AGENTS.md) | Sharp edges, and what to verify before calling work done |
 | [`SKILLS.md`](SKILLS.md) | Engineering practices this project holds itself to |
 | [`docs/benchmarks.md`](docs/benchmarks.md) | Measured numbers, with methodology |
+| [`docs/deployment.md`](docs/deployment.md) | How it is deployed, and what the deployment does not do |

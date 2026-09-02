@@ -143,6 +143,14 @@ the lease duration plus one reaper interval, whichever comes first. In practice
 the worker-lost path is faster, because a lost worker's leases are released
 immediately rather than serving out their remainder.
 
+**A clean shutdown is never load-bearing.** A worker asked to stop finishes its
+in-flight tasks, records itself `STOPPED` and releases any lease it still holds,
+so an ordinary redeploy does not spend the worker-lost path. None of that is
+relied on: a worker that is killed says nothing, and the reaper's `LOST` path
+recovers its tasks exactly as it always has. The distinction exists so an
+operator reading the worker table can tell an expected absence from a crash, not
+so recovery gets faster.
+
 Three constraints are enforced by `config.Timing.Validate` rather than left to
 documentation:
 

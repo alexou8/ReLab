@@ -246,7 +246,9 @@ th.mono {
 .fact .value {
   font-family: var(--mono);
   font-size: 14px;
-  word-break: break-all;
+  /* Breaks at a hyphen or between words, not mid-token: a run id split as
+     "...-a40 0-a9e..." reads as two different ids. */
+  overflow-wrap: break-word;
 }
 
 .detail {
@@ -259,4 +261,239 @@ th.mono {
   font-size: 13px;
   display: inline-block;
   margin-bottom: 16px;
+}
+
+/* Skip link: visible only when focused, which is when it is useful. */
+.skip {
+  position: absolute;
+  left: -9999px;
+}
+
+.skip:focus {
+  left: 12px;
+  top: 12px;
+  z-index: 10;
+  background: var(--bg);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+
+/* Available to screen readers, not laid out. Used for table captions, which
+   say what a dense table is before a reader is inside it. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Mode banner: which deployment this is, said once. */
+.mode {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--idle);
+  border-radius: 4px;
+  background: var(--surface);
+  padding: 10px 14px;
+  margin: 0 0 24px;
+}
+
+.mode-demo {
+  border-left-color: var(--warn);
+}
+
+.mode-live {
+  border-left-color: var(--ok);
+}
+
+.mode-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text);
+  margin-right: 10px;
+}
+
+.mode code,
+.explainer code,
+.note code {
+  font-family: var(--mono);
+  font-size: 0.92em;
+}
+
+/* The one prose block in the dashboard: what ReLab is, for a reader who has
+   never seen it. Measure is capped because a 1100px line of prose is unreadable
+   even when a 1100px table is not. */
+.explainer p {
+  max-width: 70ch;
+  margin: 0 0 10px;
+}
+
+.explainer p:last-child {
+  margin-bottom: 0;
+}
+
+/* The explainer's qualifying paragraph is prose, not data, so it keeps the
+   body font even though it is muted like a detail cell. */
+.explainer .detail {
+  font-family: var(--sans);
+  font-size: 14px;
+  max-width: 70ch;
+}
+
+/* A note under a table or a set of counts, saying where the numbers come from.
+   These are the sentences that keep a metric from being taken on trust. */
+.note {
+  max-width: 80ch;
+  margin: 10px 0 0;
+  line-height: 1.6;
+  font-family: var(--sans);
+}
+
+/* Filters. Links rather than controls, so a filtered view is a URL and the
+   page needs no JavaScript to produce one. */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.filter {
+  font-size: 12px;
+  font-family: var(--mono);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 9px;
+  color: var(--muted);
+  background: var(--surface);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.filter:hover {
+  border-color: var(--accent);
+  text-decoration: none;
+}
+
+.filter-on {
+  color: var(--text);
+  border-color: var(--accent);
+  /* Not colour alone: the selected filter is also the only bold one, so it is
+     still identifiable in monochrome. */
+  font-weight: 600;
+}
+
+.filter-count {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.filter-on .filter-count {
+  color: var(--accent);
+}
+
+/* A row header cell carries the row's name, so a screen reader announces which
+   task or worker a cell belongs to. It should not look like a header. */
+th.row-name {
+  font-weight: 400;
+  font-size: 14px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text);
+}
+
+/* Timeline */
+.timeline {
+  /* Below this the columns squeeze until a payload wraps to five lines and the
+     rows stop being scannable. Scrolling sideways through a sequence is much
+     better than reading a sequence with gaps in it. */
+  min-width: 46rem;
+}
+
+.timeline td {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+/* Trouble rows are marked by a rule down the left as well as by the amber
+   status word, so they are findable when scrolling and identifiable without
+   colour. */
+.row-trouble td:first-child {
+  box-shadow: inset 2px 0 0 var(--warn);
+}
+
+td.wrap {
+  white-space: normal;
+  overflow-wrap: break-word;
+  min-width: 16ch;
+  /* An idempotency key is long and nobody reads it across the full width of a
+     wide screen; three lines of it is enough to recognise. */
+  max-width: 52ch;
+}
+
+.notice-ok {
+  border-left-color: var(--ok);
+}
+
+.notice-bad {
+  border-left-color: var(--bad);
+}
+
+.notice p + p {
+  margin-top: 8px;
+}
+
+.count .value {
+  /* Counts are compared down a column, so they line up whatever their width. */
+  font-variant-numeric: tabular-nums;
+}
+
+/* Narrow screens. The tables scroll rather than reflow: a timeline whose rows
+   have been rearranged to fit is no longer a sequence, and the sequence is the
+   evidence. Everything around them stacks. */
+@media (max-width: 640px) {
+  .layout {
+    padding: 16px 12px 48px;
+  }
+
+  header.masthead {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .counts {
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  }
+
+  .count .value {
+    font-size: 20px;
+  }
+
+  table {
+    font-size: 13px;
+  }
+}
+
+/* Someone who has asked for less motion gets none. There is very little here to
+   begin with, which is the point. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
