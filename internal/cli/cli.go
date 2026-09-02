@@ -55,6 +55,9 @@ func Execute(version string) error {
 		newWorkflowCmd(g),
 		newRunCmd(g),
 		newRunsCmd(g),
+		newServerCmd(g, version),
+		newWorkerCmd(g, version),
+		newWorkersCmd(g),
 	)
 
 	// A cancelled context reaches every command, so Ctrl-C stops a worker or a

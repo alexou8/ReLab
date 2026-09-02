@@ -108,3 +108,43 @@ func TestIntRejectsUnparseableValue(t *testing.T) {
 		t.Fatalf("Int returned %v, want a parse error rather than a silent fallback", err)
 	}
 }
+
+func TestTimingFromEnvAppliesOverrides(t *testing.T) {
+	t.Setenv(config.EnvLeaseDuration, "400ms")
+	t.Setenv(config.EnvLeaseRenewInterval, "100ms")
+	t.Setenv(config.EnvHeartbeatInterval, "50ms")
+
+	timing, err := config.TimingFromEnv()
+	if err != nil {
+		t.Fatalf("TimingFromEnv: %v", err)
+	}
+	if timing.LeaseDuration != 400*time.Millisecond {
+		t.Fatalf("lease duration is %s, want 400ms", timing.LeaseDuration)
+	}
+	if timing.HeartbeatInterval != 50*time.Millisecond {
+		t.Fatalf("heartbeat interval is %s, want 50ms", timing.HeartbeatInterval)
+	}
+	// Untouched values keep their defaults.
+	if timing.ReaperInterval != config.DefaultReaperInterval {
+		t.Fatalf("reaper interval is %s, want the default %s", timing.ReaperInterval, config.DefaultReaperInterval)
+	}
+}
+
+func TestTimingFromEnvValidatesTheWholeSet(t *testing.T) {
+	// Shortening the lease without shortening the renewal interval is the
+	// mistake that produces "random" duplicate executions.
+	t.Setenv(config.EnvLeaseDuration, "400ms")
+	_, err := config.TimingFromEnv()
+	if err == nil || !strings.Contains(err.Error(), "at most half the lease duration") {
+		t.Fatalf("TimingFromEnv returned %v, want a lease/renewal mismatch error", err)
+	}
+}
+
+func TestDurationRejectsAUnitlessValue(t *testing.T) {
+	t.Setenv(config.EnvLeaseDuration, "500")
+	_, err := config.Duration(config.EnvLeaseDuration, time.Second)
+	if err == nil || !strings.Contains(err.Error(), "must be a duration with a unit") {
+		t.Fatalf("Duration returned %v; running with a 30s lease because someone wrote 500 "+
+			"instead of 500ms would look like a scheduler bug", err)
+	}
+}

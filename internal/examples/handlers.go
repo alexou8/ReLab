@@ -11,6 +11,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"sort"
+	"time"
 
 	"github.com/alexou8/relab/sdk"
 )
@@ -25,6 +28,8 @@ func Register(reg *sdk.Registry) error {
 		"split_input":     splitInput,
 		"process_shard":   processShard,
 		"merge_shards":    mergeShards,
+		"slow_step":       slowStep,
+		"summarize":       summarize,
 	}
 	for name, h := range handlers {
 		if err := reg.Handle(name, h); err != nil {
@@ -39,6 +44,60 @@ func MustRegister(reg *sdk.Registry) {
 	if err := Register(reg); err != nil {
 		panic(err)
 	}
+}
+
+// slowStep sleeps for a configurable time and then succeeds. It exists so that
+// a worker can be killed while a task is genuinely in flight: every other
+// example handler finishes in microseconds, which makes "kill the worker
+// mid-task" a race the test would lose most of the time.
+//
+// The duration comes from the environment because the process-level tests and
+// the docker compose demo want different values, and a handler that reads its
+// own configuration is preferable to seven handlers that each take a parameter
+// the workflow format does not have.
+func slowStep(ctx context.Context, tc *sdk.TaskContext) (any, error) {
+	d := 2 * time.Second
+	if raw := os.Getenv("RELAB_SLOW_STEP_DURATION"); raw != "" {
+		parsed, err := time.ParseDuration(raw)
+		if err != nil {
+			return nil, sdk.Permanent(fmt.Errorf(
+				"RELAB_SLOW_STEP_DURATION must be a duration with a unit, got %q: %w", raw, err))
+		}
+		d = parsed
+	}
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		// Respecting cancellation is the contract; a handler that ignores it
+		// keeps holding a lease the coordinator has already given up on.
+		return nil, ctx.Err()
+	case <-timer.C:
+	}
+	return map[string]any{"slept_ms": d.Milliseconds(), "attempt": tc.Attempt}, nil
+}
+
+// summarize reads whatever its dependencies produced, whatever they are called.
+// Every other example handler names its upstream step, which couples the
+// handler to one position in one workflow; this one is the step to reuse when
+// composing a new example.
+func summarize(_ context.Context, tc *sdk.TaskContext) (any, error) {
+	names := tc.InputNames()
+	sort.Strings(names)
+	summary := make(map[string]any, len(names))
+	for _, name := range names {
+		var value any
+		if err := tc.Input(name, &value); err != nil {
+			return nil, sdk.Permanent(err)
+		}
+		summary[name] = value
+	}
+	body, err := json.Marshal(summary)
+	if err != nil {
+		return nil, err
+	}
+	tc.Emit("summary.json", "application/json", body)
+	return map[string]int{"inputs": len(names)}, nil
 }
 
 type rowCount struct {

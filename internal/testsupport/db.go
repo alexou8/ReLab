@@ -126,3 +126,14 @@ func replaceDatabase(dsn, database string) string {
 	}
 	return strings.Join(out, " ")
 }
+
+// DatabaseDSN returns a connection string for the database DB created, so that
+// a test can hand it to a spawned process.
+func DatabaseDSN(t *testing.T, db *store.DB) string {
+	t.Helper()
+	var name string
+	if err := db.Conn().QueryRow(context.Background(), `SELECT current_database()`).Scan(&name); err != nil {
+		t.Fatalf("read current database: %v", err)
+	}
+	return replaceDatabase(TestDSN(t), name)
+}

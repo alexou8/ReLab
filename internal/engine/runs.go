@@ -249,3 +249,63 @@ func nullString(s string) *string {
 	}
 	return &s
 }
+
+// Stats is the overview the dashboard and `/api/v1/stats` show.
+type Stats struct {
+	RunsByStatus  map[string]int `json:"runs_by_status"`
+	TasksByStatus map[string]int `json:"tasks_by_status"`
+	Workers       map[string]int `json:"workers_by_status"`
+	QueueDepth    int            `json:"queue_depth"`
+	DeadLetters   int            `json:"dead_letters"`
+}
+
+// Stats returns the counts behind the overview.
+//
+// It is four grouped counts rather than one query per number: the dashboard
+// polls this, and a page that issues a dozen round trips to render a header is
+// how a debugging tool becomes the thing that needs debugging.
+func (e *Engine) Stats(ctx context.Context) (Stats, error) {
+	stats := Stats{
+		RunsByStatus:  map[string]int{},
+		TasksByStatus: map[string]int{},
+		Workers:       map[string]int{},
+	}
+	if err := countByStatus(ctx, e.db.Conn(),
+		`SELECT status, count(*) FROM runs GROUP BY status`, stats.RunsByStatus); err != nil {
+		return Stats{}, err
+	}
+	if err := countByStatus(ctx, e.db.Conn(),
+		`SELECT status, count(*) FROM tasks GROUP BY status`, stats.TasksByStatus); err != nil {
+		return Stats{}, err
+	}
+	if err := countByStatus(ctx, e.db.Conn(),
+		`SELECT status, count(*) FROM workers GROUP BY status`, stats.Workers); err != nil {
+		return Stats{}, err
+	}
+	if err := e.db.Conn().QueryRow(ctx,
+		`SELECT count(*) FROM dead_letters`).Scan(&stats.DeadLetters); err != nil {
+		return Stats{}, fmt.Errorf("engine: count dead letters: %w", store.Classify(err))
+	}
+	stats.QueueDepth = stats.TasksByStatus[string(TaskReady)] + stats.TasksByStatus[string(TaskRetrying)]
+	return stats, nil
+}
+
+func countByStatus(ctx context.Context, conn store.Conn, query string, into map[string]int) error {
+	rows, err := conn.Query(ctx, query)
+	if err != nil {
+		return fmt.Errorf("engine: count by status: %w", store.Classify(err))
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var status string
+		var count int
+		if err := rows.Scan(&status, &count); err != nil {
+			return fmt.Errorf("engine: scan status count: %w", store.Classify(err))
+		}
+		into[status] = count
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("engine: count by status: %w", store.Classify(err))
+	}
+	return nil
+}

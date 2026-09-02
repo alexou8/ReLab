@@ -158,3 +158,85 @@ func Int(key string, fallback int) (int, error) {
 	}
 	return v, nil
 }
+
+// Environment variables that compress the recovery windows.
+//
+// They exist because the fault scenarios and the process-level tests have to
+// observe real lease expiry and real heartbeat thresholds, and waiting the
+// production 30 seconds for each would make the suite unusable. They are
+// documented rather than hidden: an operator tuning recovery latency needs the
+// same knobs.
+const (
+	EnvLeaseDuration      = "RELAB_LEASE_DURATION"
+	EnvLeaseRenewInterval = "RELAB_LEASE_RENEW_INTERVAL"
+	EnvHeartbeatInterval  = "RELAB_HEARTBEAT_INTERVAL"
+	EnvReaperInterval     = "RELAB_REAPER_INTERVAL"
+	EnvTaskTimeout        = "RELAB_TASK_TIMEOUT"
+	EnvSuspectAfterBeats  = "RELAB_SUSPECT_AFTER_BEATS"
+	EnvLostAfterBeats     = "RELAB_LOST_AFTER_BEATS"
+)
+
+// TimingFromEnv returns the defaults with any environment overrides applied,
+// validated as a whole.
+//
+// It validates after applying every override rather than after each one, so
+// that setting a shorter lease and a shorter renewal interval together is
+// accepted while setting only the lease is rejected — the constraint is between
+// the two values, not on either alone.
+func TimingFromEnv() (Timing, error) {
+	timing := DefaultTiming()
+	durations := []struct {
+		key    string
+		target *time.Duration
+	}{
+		{EnvLeaseDuration, &timing.LeaseDuration},
+		{EnvLeaseRenewInterval, &timing.LeaseRenewInterval},
+		{EnvHeartbeatInterval, &timing.HeartbeatInterval},
+		{EnvReaperInterval, &timing.ReaperInterval},
+		{EnvTaskTimeout, &timing.TaskTimeout},
+	}
+	for _, d := range durations {
+		v, err := Duration(d.key, *d.target)
+		if err != nil {
+			return Timing{}, err
+		}
+		*d.target = v
+	}
+	counts := []struct {
+		key    string
+		target *int
+	}{
+		{EnvSuspectAfterBeats, &timing.SuspectAfterBeats},
+		{EnvLostAfterBeats, &timing.LostAfterBeats},
+	}
+	for _, c := range counts {
+		v, err := Int(c.key, *c.target)
+		if err != nil {
+			return Timing{}, err
+		}
+		*c.target = v
+	}
+	if err := timing.Validate(); err != nil {
+		return Timing{}, err
+	}
+	return timing, nil
+}
+
+// Duration returns a duration environment variable, or a fallback. As with Int,
+// a present but unparseable value is an error: silently running with a 30
+// second lease because someone wrote "500" instead of "500ms" would look like a
+// scheduler bug.
+func Duration(key string, fallback time.Duration) (time.Duration, error) {
+	raw := os.Getenv(key)
+	if raw == "" {
+		return fallback, nil
+	}
+	v, err := time.ParseDuration(raw)
+	if err != nil {
+		return 0, fmt.Errorf("config: %s must be a duration with a unit, such as 30s or 500ms, got %q", key, raw)
+	}
+	if v <= 0 {
+		return 0, fmt.Errorf("config: %s must be positive, got %q", key, raw)
+	}
+	return v, nil
+}

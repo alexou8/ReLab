@@ -51,3 +51,27 @@ M1.E example workflows and handlers                     | orchestrator | done | 
 `RUN_SUCCEEDED`. `examples/fan-out.yaml` exercises fan-out and the fan-in
 barrier; `TestFanInWaitsForEveryDependency` asserts the barrier releases
 exactly once and only after both branches succeed.
+
+## M2 — Worker pool and leases
+
+```
+M2.1 reaper: lease expiry, requeue, dead-letter      | orchestrator | done | internal/engine
+M2.2 worker liveness sweep, SUSPECT then LOST        | orchestrator | done | internal/engine
+M2.3 lease renewal returning the ids it kept         | orchestrator | done | internal/engine
+M2.4 worker process: claim, heartbeat, renew loops   | orchestrator | done | internal/worker
+M2.5 coordinator: stateless recovery sweep on a timer| orchestrator | done | internal/engine
+M2.6 HTTP API: runs, tasks, events, workers, stats   | orchestrator | done | internal/api
+M2.7 CLI: server, worker, workers                    | orchestrator | done | internal/cli
+M2.8 timing overridable from the environment         | orchestrator | done | internal/config
+M2.9 process-level SIGKILL tests with real binaries  | orchestrator | done | test/process
+M2.A Dockerfile and the three-worker compose stack   | orchestrator | done | (root)
+M2.B decision 0004: lease renewal vs execution bound | orchestrator | done | docs/decisions
+```
+
+**Acceptance:** `TestThreeWorkersProcessAFanOutWithoutDoubleExecution` runs a
+21-task fan-out across three workers and asserts every task recorded exactly one
+attempt, with no `(task, attempt)` pair started twice.
+`TestSIGKILLedWorkerLosesItsTaskAndTheRunStillSucceeds` spawns a real worker
+binary, waits until the database says it holds the running task, `SIGKILL`s that
+exact process, and asserts the run still succeeds via `TASK_LEASE_EXPIRED` and
+`TASK_REQUEUED`.
