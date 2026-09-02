@@ -100,6 +100,7 @@ func newRunCmd(g *global) *cobra.Command {
 				if err != nil {
 					return err
 				}
+				defer runner.Close(ctx)
 				if _, err := runner.Run(ctx, run.ID); err != nil {
 					return err
 				}
