@@ -25,7 +25,7 @@ export RELAB_HEARTBEAT_INTERVAL=${RELAB_HEARTBEAT_INTERVAL:-300ms}
 export RELAB_REAPER_INTERVAL=${RELAB_REAPER_INTERVAL:-200ms}
 export RELAB_LOG_LEVEL=${RELAB_LOG_LEVEL:-error}
 
-go build -o bin/relab ./cmd/relab
+make build
 bin/relab migrate
 
 # Oldest first: the run list is newest first, so the headline scenario is
