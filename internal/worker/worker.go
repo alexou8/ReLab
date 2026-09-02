@@ -29,6 +29,9 @@ type Options struct {
 	// database round trip, so an idle fleet polling too eagerly is pure load.
 	PollInterval time.Duration
 	Logger       *slog.Logger
+	// Faults, when set, injects the scenario a run was started under. A plain
+	// `relab worker` leaves it nil and injects nothing.
+	Faults engine.FaultSource
 }
 
 // Worker executes tasks claimed from the queue.
@@ -82,9 +85,13 @@ func New(ctx context.Context, eng *engine.Engine, reg *sdk.Registry, opts Option
 		return nil, err
 	}
 	log := opts.Logger.With("worker_id", id, "hostname", opts.Hostname)
+	executor := engine.NewExecutor(eng, reg, id, log)
+	if opts.Faults != nil {
+		executor = executor.WithFaults(opts.Faults)
+	}
 	return &Worker{
 		engine:   eng,
-		executor: engine.NewExecutor(eng, reg, id, log),
+		executor: executor,
 		registry: reg,
 		id:       id,
 		opts:     opts,

@@ -148,3 +148,19 @@ func (s *Scenario) Deterministic() bool {
 	}
 	return true
 }
+
+// NeedsSeparateWorkers reports whether any fault in the scenario kills the
+// process executing a task.
+//
+// Such a scenario cannot be run in the process that is also driving and
+// asserting on the run — killing the test is not a test — so `relab test`
+// spawns workers for it. The decision is made from the scenario rather than
+// left to whoever runs it to remember.
+func (s *Scenario) NeedsSeparateWorkers() bool {
+	for _, f := range s.Faults {
+		if f.Type == WorkerCrash {
+			return true
+		}
+	}
+	return false
+}

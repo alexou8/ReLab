@@ -1,0 +1,12 @@
+# The control. No faults, so nothing should retry and nothing should be lost.
+# A corpus without a baseline cannot tell "recovery works" from "the assertions
+# are too loose to fail".
+name: baseline-no-faults
+seed: 1
+faults: []
+assert:
+  run_status: SUCCEEDED
+  lost_tasks: 0
+  duplicate_effects: 0
+  max_retries_per_task: 0
+  faults_injected: 0

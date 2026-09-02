@@ -12,6 +12,8 @@ import (
 
 	"github.com/alexou8/relab/internal/config"
 	"github.com/alexou8/relab/internal/engine"
+	"github.com/alexou8/relab/internal/fault"
+	"github.com/alexou8/relab/internal/faultengine"
 	"github.com/alexou8/relab/internal/worker"
 )
 
@@ -66,6 +68,7 @@ func newServerCmd(g *global, version string) *cobra.Command {
 
 func newWorkerCmd(g *global, version string) *cobra.Command {
 	var concurrency int
+	var scenarioPath string
 	cmd := &cobra.Command{
 		Use:   "worker",
 		Short: "Run a worker that claims and executes tasks",
@@ -91,10 +94,26 @@ func newWorkerCmd(g *global, version string) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			var faults engine.FaultSource
+			if scenarioPath != "" {
+				scenario, err := fault.LoadScenario(scenarioPath)
+				if err != nil {
+					return err
+				}
+				// The worker injects only the scenario it was given. A run
+				// started under a scenario this worker does not have fails
+				// loudly rather than running unfaulted, which would report a
+				// passing reliability test that never ran.
+				faults = faultengine.NewSource(eng, faultengine.StaticLookup(scenario))
+				log.InfoContext(ctx, "fault injection enabled",
+					"scenario", scenario.Name, "seed", scenario.Seed)
+			}
+
 			w, err := worker.New(ctx, eng, defaultRegistry(), worker.Options{
 				Concurrency: concurrency,
 				Version:     version,
 				Logger:      log,
+				Faults:      faults,
 			})
 			if err != nil {
 				return err
@@ -111,6 +130,8 @@ func newWorkerCmd(g *global, version string) *cobra.Command {
 	}
 	cmd.Flags().IntVar(&concurrency, "concurrency", defaultConcurrency,
 		"tasks to execute at once (default: $"+config.EnvWorkerConcurrency+" or 4)")
+	cmd.Flags().StringVar(&scenarioPath, "scenario", "",
+		"inject this scenario's faults into runs started under it")
 	return cmd
 }
 

@@ -30,6 +30,26 @@ type LocalRunner struct {
 	pollInterval time.Duration
 }
 
+// DriveWithFaults creates an in-process runner with a fault source attached and
+// drives a run to completion.
+//
+// It is what `relab test` uses: one process, one run, faults injected at the
+// executor's trigger points. A scenario whose faults kill the worker process
+// cannot be run this way — the process being killed is this one — and those
+// scenarios are run against a worker pool instead.
+func (e *Engine) DriveWithFaults(ctx context.Context, runID uuid.UUID, reg *sdk.Registry,
+	faults FaultSource) error {
+	runner, err := NewLocalRunner(ctx, e, reg, nil)
+	if err != nil {
+		return err
+	}
+	runner.executor = runner.executor.WithFaults(faults)
+	if _, err := runner.Run(ctx, runID); err != nil {
+		return err
+	}
+	return nil
+}
+
 // NewLocalRunner registers an in-process worker and returns a runner.
 func NewLocalRunner(ctx context.Context, e *Engine, reg *sdk.Registry, log *slog.Logger) (*LocalRunner, error) {
 	if log == nil {

@@ -26,6 +26,29 @@ type Executor struct {
 	registry *sdk.Registry
 	workerID uuid.UUID
 	log      *slog.Logger
+
+	// faults, when set, is consulted at each trigger point. It is per-run:
+	// see Engine.InjectorFor.
+	faults FaultSource
+}
+
+// FaultSource supplies the injector for a run, or nil when the run has no
+// scenario. It is an interface so that package engine does not depend on
+// package fault's concrete types, which would make the dependency cycle
+// fault -> engine -> fault.
+type FaultSource interface {
+	// For returns the injector for a run, and whether one exists.
+	For(ctx context.Context, runID uuid.UUID) (TriggerPoints, error)
+}
+
+// TriggerPoints is the part of a fault injector the executor uses.
+type TriggerPoints interface {
+	// Point evaluates a named trigger point. It returns an error when the fault
+	// fails the task, does not return at all when the fault kills the process,
+	// and returns nil otherwise.
+	Point(ctx context.Context, point string, taskName string, attempt int) error
+	// ShouldDuplicate reports whether this attempt should be executed twice.
+	ShouldDuplicate(taskName string, attempt int) bool
 }
 
 // NewExecutor returns an Executor acting as the given worker.
@@ -34,6 +57,39 @@ func NewExecutor(e *Engine, reg *sdk.Registry, workerID uuid.UUID, log *slog.Log
 		log = slog.Default()
 	}
 	return &Executor{engine: e, registry: reg, workerID: workerID, log: log}
+}
+
+// WithFaults returns a copy of the executor that consults a fault source.
+func (x *Executor) WithFaults(source FaultSource) *Executor {
+	clone := *x
+	clone.faults = source
+	return &clone
+}
+
+// The trigger points the executor evaluates. They are strings here rather than
+// fault.Point for the dependency reason given on FaultSource; package fault
+// owns the canonical list and validates scenario files against it.
+const (
+	pointAfterTaskLease  = "after-task-lease"
+	pointAfterTaskStart  = "after-task-start"
+	pointBeforeTaskAck   = "before-task-ack"
+	pointAfterTaskFinish = "after-task-finish"
+)
+
+// trigger evaluates one point, returning the injected error if the fault fails
+// the task. A run with no scenario costs one nil check.
+func (x *Executor) trigger(ctx context.Context, runID uuid.UUID, point, taskName string, attempt int) error {
+	if x.faults == nil {
+		return nil
+	}
+	points, err := x.faults.For(ctx, runID)
+	if err != nil {
+		return err
+	}
+	if points == nil {
+		return nil
+	}
+	return points.Point(ctx, point, taskName, attempt)
 }
 
 // Execute runs one claimed task to completion and records the outcome.
@@ -55,6 +111,14 @@ func (x *Executor) Execute(ctx context.Context, claimed ClaimedTask) error {
 		})
 	}
 
+	// after-task-lease fires between winning the claim and entering the
+	// handler: the window where losing the worker costs nothing, so recovery
+	// should be invisible.
+	if err := x.trigger(ctx, claimed.RunID, pointAfterTaskLease,
+		claimed.Task.Name, claimed.Task.Attempt); err != nil {
+		return x.engine.CompleteTask(ctx, x.workerID, claimed.Task, Outcome{Err: err})
+	}
+
 	if err := x.engine.StartTask(ctx, x.workerID, claimed.Task, claimed.Handler); err != nil {
 		// Losing the lease between claim and start is ordinary; the task is
 		// already someone else's problem.
@@ -64,13 +128,37 @@ func (x *Executor) Execute(ctx context.Context, claimed ClaimedTask) error {
 		return err
 	}
 
+	// after-task-start fires with the task marked RUNNING and the handler about
+	// to be entered. This is where worker-crash belongs: the task is in flight,
+	// so recovery has to go through lease expiry and the idempotency ledger.
+	if err := x.trigger(ctx, claimed.RunID, pointAfterTaskStart,
+		claimed.Task.Name, claimed.Task.Attempt); err != nil {
+		return x.engine.CompleteTask(ctx, x.workerID, claimed.Task, Outcome{Err: err})
+	}
+
 	ledger := newLedger(x.engine, claimed.Task, x.workerID)
 	tc := sdk.NewTaskContext(claimed.RunID, claimed.Task.Name, claimed.Task.Attempt,
 		x.workerID, claimed.Inputs, ledger)
 
 	outcome := x.invoke(ctx, handler, tc, claimed)
+
+	// before-task-ack fires after the handler returned and before the outcome
+	// is recorded — the window the idempotency ledger exists for. A crash here
+	// means the work happened and nothing knows it.
+	if err := x.trigger(ctx, claimed.RunID, pointBeforeTaskAck,
+		claimed.Task.Name, claimed.Task.Attempt); err != nil && outcome.Err == nil {
+		outcome.Err = err
+	}
+
 	if err := x.engine.CompleteTask(ctx, x.workerID, claimed.Task, outcome); err != nil {
 		return err
+	}
+
+	if err := x.trigger(ctx, claimed.RunID, pointAfterTaskFinish,
+		claimed.Task.Name, claimed.Task.Attempt); err != nil {
+		// The task is already recorded; a fault here can only be reported.
+		x.log.WarnContext(ctx, "fault fired after the task was recorded",
+			"run_id", claimed.RunID, "task", claimed.Task.Name, "error", err)
 	}
 	return nil
 }

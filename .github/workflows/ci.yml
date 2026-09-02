@@ -65,3 +65,43 @@ jobs:
 
       - name: Test
         run: go test -race -timeout 15m ./...
+
+  scenarios:
+    name: fault scenario corpus
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: relab
+          POSTGRES_PASSWORD: relab
+          POSTGRES_DB: relab
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U relab"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    env:
+      RELAB_TEST_DSN: postgres://relab:relab@localhost:5432/postgres?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      # Every file in examples/scenarios runs here. The corpus is discovered
+      # from the directory, so adding a scenario to the repository is enough to
+      # add it to CI — a corpus that has to be registered in two places quietly
+      # stops covering the newest cases.
+      - name: Run the scenario corpus
+        run: go test -v -timeout 15m ./test/scenarios/
+
+      # The process-level suite spawns real worker binaries and SIGKILLs them.
+      # It is the suite that distinguishes recovery that works from recovery
+      # that is only claimed, so it runs on every push rather than nightly.
+      - name: Run the process-level crash suite
+        run: go test -v -timeout 15m ./test/process/

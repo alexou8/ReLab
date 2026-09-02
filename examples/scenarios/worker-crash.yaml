@@ -1,11 +1,16 @@
-# Kill the worker holding `analyze` the moment its handler starts. The task is
-# recovered by lease expiry, not by the worker doing anything on the way out —
-# the process is gone. The assertions say what recovery has to look like.
+# Kill the worker holding `analyze` the moment its handler starts. The process
+# gets no chance to release its lease, so the task can only come back through
+# lease expiry — which is the mechanism that also works when a machine loses
+# power.
+#
+# The fault targets attempt 1 only. Without that it would fire on every attempt
+# and the run could never finish, which would make the scenario a test of the
+# retry limit rather than of recovery.
 name: worker-crash-during-analyze
 seed: 42
 faults:
   - type: worker-crash
-    target: {task: analyze}
+    target: {task: analyze, attempt: 1}
     at: after-task-start
 assert:
   run_status: SUCCEEDED

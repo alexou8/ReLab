@@ -118,3 +118,27 @@ its re-reduction and to artifact hashes that agree with the artifacts table.
 ways — a deleted event, an unknown type, a stripped payload version, a future
 payload version — and asserts each produces a specific, named failure rather
 than a panic or a plausible-looking wrong answer.
+
+## M5 — Fault lab and test runner
+
+```
+M5.1 injector: trigger points, targets, seeded draws  | orchestrator | done | internal/fault
+M5.2 all six v1 fault types                           | orchestrator | done | internal/fault
+M5.3 FAULT_INJECTED recorded before the fault fires   | orchestrator | done | internal/faultengine
+M5.4 trigger points wired into the executor           | orchestrator | done | internal/engine
+M5.5 assert package, answered from the journal        | orchestrator | done | internal/assert
+M5.6 `relab test`, exit codes, --json, --repeat       | orchestrator | done | internal/cli
+M5.7 supervised worker pool for crash scenarios       | orchestrator | done | internal/cli
+M5.8 `relab worker --scenario`                        | orchestrator | done | internal/cli
+M5.9 scenario corpus, discovered from the directory   | orchestrator | done | examples/scenarios
+M5.A CI jobs for the corpus and the crash suite       | orchestrator | done | .github/workflows
+M5.B decision 0007                                    | orchestrator | done | docs/decisions
+```
+
+**Acceptance:** `relab test examples/data-pipeline.yaml --scenario
+examples/scenarios/worker-crash.yaml --repeat 20` passed 20 of 20 with no
+failures. Deliberately breaking the reaper — making `expireLeases` look for
+leases that expired 24 hours ago — makes the same command exit 1 with the run
+never completing, because a SIGKILLed worker's task has no other way back.
+`TestScenarioCorpus` runs all five scenarios and checks that the command's exit
+code agrees with its report, so a CI step cannot pass on a failing scenario.

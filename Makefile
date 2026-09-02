@@ -42,6 +42,14 @@ test: ## Run every test, including the ones that need PostgreSQL
 test-unit: ## Run only tests that need no database
 	RELAB_TEST_DSN= go test -race -timeout 5m $(PKG)
 
+.PHONY: scenarios
+scenarios: ## Run every scenario in examples/scenarios as a regression suite
+	go test -v -timeout 15m ./test/scenarios/
+
+.PHONY: crash-tests
+crash-tests: ## Run the process-level suite that SIGKILLs real worker binaries
+	go test -v -timeout 15m ./test/process/
+
 .PHONY: check
 check: vet lint test ## The milestone gate: vet, lint, and the full test suite
 
