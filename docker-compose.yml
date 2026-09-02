@@ -1,0 +1,24 @@
+# Local ReLab stack. `docker compose up` brings up PostgreSQL, the control
+# plane and three workers — enough to kill a worker mid-run and watch the task
+# recover, which is the point of the project.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: relab
+      POSTGRES_PASSWORD: relab
+      POSTGRES_DB: relab
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # Without this the API and workers race the database on a cold start and
+      # crash-loop until it is ready.
+      test: ["CMD-SHELL", "pg_isready -U relab -d relab"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  pgdata:

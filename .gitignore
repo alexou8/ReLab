@@ -1,0 +1,24 @@
+# Build output
+/bin/
+/dist/
+relab
+
+# Test and benchmark output
+*.out
+/coverage.*
+/bench-results/
+
+# Local environment
+.env
+.env.local
+
+# Dashboard
+/web/node_modules/
+/web/.next/
+/web/out/
+/web/next-env.d.ts
+
+# Editors
+.DS_Store
+.idea/
+*.swp
