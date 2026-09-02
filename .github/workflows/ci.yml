@@ -59,6 +59,13 @@ jobs:
           go mod tidy
           git diff --exit-code -- go.mod go.sum
 
+      # Building the binary explicitly, by package path. `go build ./...` would
+      # pass on a checkout that is missing cmd/relab entirely, which is exactly
+      # what a too-broad .gitignore pattern once produced — the entry point was
+      # absent from the repository and every other check stayed green.
+      - name: Build
+        run: go build -o /tmp/relab ./cmd/relab
+
       - run: go vet ./...
 
       # Installed with `go install` at a pinned version rather than through

@@ -1,7 +1,12 @@
-# Build output
+# Build output.
+#
+# The binary pattern is anchored. A bare `relab` matches at any depth, which
+# silently excluded cmd/relab/ — the program's entry point — from the
+# repository. Nothing local caught it, because the file was on disk; CI failed
+# on a checkout that had never contained it.
 /bin/
 /dist/
-relab
+/relab
 
 # Test and benchmark output
 *.out
