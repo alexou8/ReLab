@@ -28,6 +28,47 @@ without charging twice.
 
 ---
 
+## ReLab in one picture
+
+```text
+        your workflow
+              |
+              v
+      +-------------------+
+      |    ReLab engine   |     break it on purpose
+      |                   |     ---------------------
+      |  runs the tasks   |     worker crash (SIGKILL)
+      |  across real      |     duplicate delivery
+      |  worker processes |     latency spike
+      |                   |     HTTP error
+      +-------------------+     database disconnect
+              |
+              v
+      the system recovers, or does not
+              |
+              v
+      every state change and the event
+      describing it, one transaction,
+      gapless sequence
+              |
+              v
+      replay: a pure reducer rebuilds the
+      run from the journal alone
+              |
+              v
+      assertions check the recovery
+              |
+              v
+        RECOVERED / FAILED
+```
+
+Each stage is a real component: `internal/engine` writes the state and the
+events together, `internal/fault` degrades the real system rather than
+pretending to, `internal/replay` has no I/O dependency at all, and
+`internal/assert` is what turns a journal into a verdict.
+
+---
+
 ## The problem
 
 Workflow engines get tested on the happy path. The failure paths are the ones

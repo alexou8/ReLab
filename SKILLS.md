@@ -4,8 +4,10 @@ The capabilities below are the ones ReLab actually exercises. Each says when it
 applies, what standard to hold, what to prefer, and the mistake that has already
 been made or nearly made here.
 
-Skills that would pad this list — frontend framework expertise, AI/ML, mobile —
-are absent because the project does not use them.
+Skills that would pad this list — AI/ML, mobile — are absent because the
+project does not use them. Interface design is on the list because the
+dashboard is how most people will meet this project, and a page that does not
+communicate is a page the engine's argument never reaches.
 
 ---
 
@@ -235,3 +237,45 @@ adds a CI case. Non-root containers. Reproducible builds.
 **Avoid:** folding the slow suites into the main test job, where a timeout would
 hide them. Avoid `deploy.replicas` for the workers — the demo depends on being
 able to kill one by name.
+
+
+---
+
+## Interface design (the dashboard)
+
+**When:** any change under `web/`.
+
+**Standard:** every element answers "does this help someone understand,
+investigate, or reason about a failure?" The dashboard is a read-only debugging
+surface, and its job is to make one run's history legible to someone who has
+never seen ReLab, without making it less true.
+
+**Prefer:** plain language over the event type, with the event type still
+there. A reader checking the page against `relab replay` has to be able to find
+the same row by name, and a reader who cannot tell good news from bad from an
+identifier is not served by hiding the identifier either. Prefer a `<details>`
+disclosure over a modal: no JavaScript, it prints, it is keyboard-operable, and
+several can be open at once. Prefer a link over a control, so a filtered view
+is a URL that can be sent to whoever is being asked to look.
+
+**Avoid:** decoration with no job. No gradients, no glow, no floating cards, no
+KPI tiles that count nothing anyone asked about. Avoid conveying a state by
+colour alone: every status here carries a word, a hue and a glyph, so it
+survives a colour-blind reader and a monochrome print.
+
+**Decided here:** monospace is what the machine recorded, sans is what a person
+says about it. Event types, ids, sequence numbers, timestamps and payloads are
+always mono; labels, explanations and verdicts are always sans. The distinction
+between evidence and interpretation is the project's whole claim, so the type
+carries it on every page.
+
+**Mistake avoided here:** deriving a friendly name for an unknown event type
+from the shape of its identifier. That is the permissive reading `internal/event`
+refuses to do, and it would let a future type be announced as a recovery on the
+strength of its name. An unknown type renders as itself.
+
+**Skills used:** `frontend-design` (anthropics), `web-design-guidelines`
+(vercel-labs) and `ui-ux-pro-max` (nextlevelbuilder) are installed and pinned in
+`skills-lock.json`. Their recommendations are input, not instruction: the
+terminal palette, the IBM Plex pairing and the character-grid layout were chosen
+against their defaults, and the reasons are in `web/src/app/globals.css`.
