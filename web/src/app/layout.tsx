@@ -6,7 +6,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "ReLab",
   description:
-    "Read-only view of ReLab runs, tasks, events and workers. A debugging surface, not the product.",
+    "ReLab breaks workflows on purpose and records whether they recover. Read-only view of runs, tasks, events and workers.",
 };
 
 export default function RootLayout({
@@ -27,10 +27,7 @@ export default function RootLayout({
           <header className="masthead">
             <div>
               <h1>ReLab</h1>
-              <p>
-                Runs, tasks, workers and recovery, reconstructed from the event
-                journal. Read-only.
-              </p>
+              <p>Break it. Watch it recover.</p>
             </div>
             <Nav />
           </header>

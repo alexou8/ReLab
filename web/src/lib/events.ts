@@ -158,3 +158,49 @@ function recoveryMs(events: RunEvent[]): number | null {
   if (trouble === null || completed === null || completed < trouble) return null;
   return completed - trouble;
 }
+
+/**
+ * The milestones of a run's failure and recovery, in sequence order.
+ *
+ * This is a selection from the journal, never a summary of it: every entry it
+ * returns is an event that is actually in the run, at its real sequence number
+ * and its real timestamp. Its job is to let someone read the arc of a run
+ * without reading all of it, and the full sequence is always one link away.
+ *
+ * Returns an empty list for a run that was never disrupted. A run that had no
+ * failure has no failure story, and inventing a shape for one would be the
+ * marketing graphic this page is trying not to be.
+ */
+export function storyOf(events: RunEvent[]): RunEvent[] {
+  const breakAt = events.findIndex((e) => TROUBLE.has(e.Type));
+  if (breakAt === -1) return [];
+
+  const picked = new Map<number, RunEvent>();
+  const take = (e: RunEvent | undefined) => {
+    if (e) picked.set(e.Seq, e);
+  };
+
+  const first = (type: string, from = 0) =>
+    events.slice(from).find((e) => e.Type === type);
+
+  take(first("RUN_STARTED"));
+  // Everything from here is the break and what followed it. Taking the first
+  // occurrence at or after the break keeps the chain to one worked example
+  // even in a run where three tasks each failed.
+  for (const type of [
+    "FAULT_INJECTED",
+    "WORKER_LOST",
+    "TASK_LEASE_EXPIRED",
+    "TASK_REQUEUED",
+    "TASK_RETRY_SCHEDULED",
+    "TASK_STARTED",
+    "SIDE_EFFECT_SKIPPED",
+    "TASK_SUCCEEDED",
+    "TASK_DEAD_LETTERED",
+  ]) {
+    take(first(type, breakAt));
+  }
+  for (const type of TERMINAL) take(first(type));
+
+  return [...picked.values()].sort((a, b) => a.Seq - b.Seq);
+}

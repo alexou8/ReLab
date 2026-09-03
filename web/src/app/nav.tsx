@@ -9,6 +9,8 @@ const SECTIONS = [
   { href: "/workers", label: "Workers" },
 ];
 
+const REPO = "https://github.com/alexou8/relab";
+
 /**
  * The section tabs.
  *
@@ -29,6 +31,11 @@ export function Nav() {
           </Link>
         );
       })}
+      {/* Outside the section list because it leaves the dashboard, and the
+          current-page marking above would be a lie for it. */}
+      <a href={REPO} className="nav-out">
+        GitHub
+      </a>
     </nav>
   );
 }

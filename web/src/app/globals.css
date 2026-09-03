@@ -483,6 +483,12 @@ td.wrap {
   table {
     font-size: 13px;
   }
+
+  /* Squeezing a six-column table into 390px turns every cell into a column of
+     single words. Scrolling it sideways keeps the rows readable as rows. */
+  .table-scroll table {
+    min-width: 34rem;
+  }
 }
 
 /* Someone who has asked for less motion gets none. There is very little here to
@@ -496,4 +502,380 @@ td.wrap {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* ---------------------------------------------------------------------------
+   The product story.
+
+   These styles serve the overview's argument: what broke, what the system did,
+   what can be proved. They are deliberately the same ink and the same borders
+   as the tables. A landing page that looked like a different product from the
+   dashboard it introduces would undercut the thing it is introducing.
+   ------------------------------------------------------------------------- */
+
+section {
+  margin-bottom: 40px;
+}
+
+.hero {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 24px;
+}
+
+.hero-title {
+  font-size: clamp(28px, 5vw, 40px);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  margin: 0 0 12px;
+  text-transform: none;
+  color: var(--text);
+}
+
+.hero-copy {
+  max-width: 62ch;
+  font-size: 16px;
+  margin: 0 0 20px;
+  color: var(--text);
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 16px;
+}
+
+.cta {
+  display: inline-block;
+  /* 44px of target on a phone, without a pill. */
+  padding: 11px 18px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: var(--accent);
+  color: var(--bg);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.cta:hover,
+.cta:focus-visible {
+  text-decoration: none;
+  filter: brightness(1.08);
+}
+
+.cta-quiet {
+  background: transparent;
+  color: var(--accent);
+  border-color: var(--border);
+}
+
+.lead {
+  max-width: 72ch;
+  font-size: 15px;
+  margin: 0 0 16px;
+}
+
+/* The failure-to-recovery chain. An ordered list because it is one: the reader
+   is being shown a sequence, and the numbers on it are real sequence numbers. */
+.story {
+  list-style: none;
+  margin: 0 0 20px;
+  padding: 0;
+  border-left: 1px solid var(--border);
+}
+
+.step {
+  position: relative;
+  padding: 10px 0 10px 20px;
+}
+
+/* The tick on the rail marks where in the chain this step sits. It is a
+   position, not decoration: the break and the recovery steps are marked
+   differently so the shape of the run is visible before any of it is read. */
+.step::before {
+  content: "";
+  position: absolute;
+  left: -4px;
+  top: 17px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--idle);
+}
+
+.step-break::before {
+  background: var(--bad);
+}
+.step-recovery::before {
+  background: var(--warn);
+}
+.step-ok::before {
+  background: var(--ok);
+}
+
+.step-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.step-label {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* Not colour alone: a break is also the only step whose label is underlined,
+   and every step still says its own event type. */
+.step-break .step-label {
+  text-decoration: underline;
+  text-decoration-color: var(--bad);
+  text-underline-offset: 4px;
+}
+
+.step-seq {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.step-type {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.step-meaning {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+  max-width: 70ch;
+}
+
+/* The verdict. One word, then the counts behind it. */
+.verdict {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--idle);
+  border-radius: 4px;
+  background: var(--surface);
+  padding: 14px 16px;
+}
+
+.verdict-ok {
+  border-left-color: var(--ok);
+}
+.verdict-bad {
+  border-left-color: var(--bad);
+}
+
+.verdict-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 12px;
+  margin: 0 0 10px;
+}
+
+.verdict-word {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.verdict-ok .verdict-word {
+  color: var(--ok);
+}
+.verdict-bad .verdict-word {
+  color: var(--bad);
+}
+
+.verdict-facts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 6px 20px;
+}
+
+.verdict-facts li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid var(--border);
+  padding: 4px 0;
+  font-size: 13px;
+}
+
+.verdict-facts .k {
+  color: var(--muted);
+}
+
+.verdict-facts .v {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.reasons {
+  max-width: 72ch;
+  margin: 0 0 12px;
+  padding-left: 20px;
+}
+
+.reasons li {
+  margin-bottom: 4px;
+}
+
+/* The five things a ReLab run does, numbered. */
+.pipeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.pipeline-step {
+  display: flex;
+  gap: 14px;
+  background: var(--bg);
+  padding: 12px 14px;
+}
+
+.pipeline-n {
+  color: var(--muted);
+  font-size: 13px;
+  padding-top: 2px;
+}
+
+.pipeline-step h3 {
+  margin: 0 0 2px;
+  font-size: 14px;
+}
+
+.pipeline-step p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  max-width: 70ch;
+}
+
+@media (min-width: 900px) {
+  .pipeline {
+    grid-template-columns: repeat(5, 1fr);
+  }
+  .pipeline-step {
+    flex-direction: column;
+    gap: 6px;
+  }
+}
+
+.links {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.links li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+
+/* Timeline: plain language over the event type, technical detail on demand. */
+.event-label {
+  display: block;
+  font-size: 14px;
+}
+
+.event-trouble {
+  font-weight: 600;
+}
+
+.event-type {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
+/* A disclosure rather than a modal or a tooltip: it needs no JavaScript, it
+   prints, it is keyboard-operable by default, and several can be open at once
+   while comparing two attempts. */
+.raw > summary {
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.raw > summary:hover {
+  color: var(--text);
+}
+
+.raw[open] > summary {
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.raw-meaning {
+  margin: 0 0 6px;
+  font-family: var(--sans);
+  font-size: 13px;
+  max-width: 60ch;
+}
+
+.raw-fields {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px 10px;
+  margin: 0 0 6px;
+  font-size: 12px;
+}
+
+.raw-fields dt {
+  color: var(--muted);
+}
+
+.raw-fields dd {
+  margin: 0;
+  font-family: var(--mono);
+  overflow-wrap: anywhere;
+}
+
+.raw-payload {
+  margin: 0;
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-x: auto;
+  max-height: 18rem;
+}
+
+@media (max-width: 640px) {
+  .hero-actions .cta {
+    flex: 1 1 auto;
+    text-align: center;
+  }
+
+  .verdict-facts li {
+    font-size: 12px;
+  }
+}
+
+/* A link out of the dashboard sits apart from the section tabs, which are all
+   places inside it. */
+.nav-out {
+  color: var(--muted);
 }

@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ApiError, fetchEvents, fetchRun, fetchTasks } from "@/lib/api";
-import { evidenceOf, FILTERS, groupsOf, isGroup } from "@/lib/events";
+import { evidenceOf, FILTERS, groupsOf, isGroup, storyOf } from "@/lib/events";
 import { duration, preciseTime, short, summarisePayload } from "@/lib/format";
+import { phraseOf } from "@/lib/vocab";
 import { ErrorState } from "../../error-state";
 import { Status } from "../../status";
+import { Story } from "../../story";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +48,7 @@ export default async function RunDetail({
 
   const { run, tasks, events } = data;
   const evidence = evidenceOf(events);
+  const story = storyOf(events);
 
   // The filter is a link, not a control: it survives a reload, it can be shared
   // with whoever is being asked to look at the run, and it costs the page no
@@ -86,6 +89,17 @@ export default async function RunDetail({
         evidence={evidence}
         eventCount={events.length}
       />
+
+      {story.length > 0 ? (
+        <>
+          <h2>What happened</h2>
+          <p className="detail note">
+            The milestones of this run, in the order they were recorded. Each
+            one is a real event; the full sequence is in the timeline below.
+          </p>
+          <Story steps={story} />
+        </>
+      ) : null}
 
       <h2>What the journal proves</h2>
       <div className="counts">
@@ -200,40 +214,62 @@ export default async function RunDetail({
                 <th scope="col" className="mono">
                   Time
                 </th>
-                <th scope="col">Event</th>
+                <th scope="col">What happened</th>
                 <th scope="col">Task</th>
                 <th scope="col">Worker</th>
-                <th scope="col">Detail</th>
+                <th scope="col">Technical detail</th>
               </tr>
             </thead>
             <tbody>
-              {shown.map((event) => (
-                <tr
-                  key={event.Seq}
-                  className={TROUBLE.has(event.Type) ? "row-trouble" : undefined}
-                >
-                  <td className="mono">{event.Seq}</td>
-                  <td className="mono">{preciseTime(event.OccurredAt)}</td>
-                  <td className="mono">
-                    <span
-                      className={
-                        TROUBLE.has(event.Type)
-                          ? "status status-warn"
-                          : "status status-idle"
-                      }
-                    >
-                      {event.Type}
-                    </span>
-                  </td>
-                  <td>{event.TaskName || "—"}</td>
-                  <td className="mono">
-                    {event.WorkerID ? short(event.WorkerID) : "—"}
-                  </td>
-                  <td className="detail wrap">
-                    {summarisePayload(event.Payload) || "—"}
-                  </td>
-                </tr>
-              ))}
+              {shown.map((event) => {
+                const phrase = phraseOf(event.Type);
+                const trouble = TROUBLE.has(event.Type);
+                return (
+                  <tr key={event.Seq} className={trouble ? "row-trouble" : undefined}>
+                    <td className="mono">{event.Seq}</td>
+                    <td className="mono">{preciseTime(event.OccurredAt)}</td>
+                    <td>
+                      {/* Plain language first, the event type under it. The
+                          type is the evidence and is never replaced: a reader
+                          checking this page against `relab replay` has to be
+                          able to find the same row by name. */}
+                      <span className={trouble ? "event-label event-trouble" : "event-label"}>
+                        {phrase?.label ?? event.Type}
+                      </span>
+                      <code className="event-type">{event.Type}</code>
+                    </td>
+                    <td>{event.TaskName || "—"}</td>
+                    <td className="mono">
+                      {event.WorkerID ? short(event.WorkerID) : "—"}
+                    </td>
+                    <td className="detail wrap">
+                      <details className="raw">
+                        <summary>
+                          {summarisePayload(event.Payload) || "no payload fields"}
+                        </summary>
+                        {phrase ? (
+                          <p className="raw-meaning">{phrase.meaning}</p>
+                        ) : null}
+                        <dl className="raw-fields">
+                          <dt>Event</dt>
+                          <dd>{event.Type}</dd>
+                          <dt>Sequence</dt>
+                          <dd>{event.Seq}</dd>
+                          <dt>Task</dt>
+                          <dd>{event.TaskName || "—"}</dd>
+                          <dt>Worker</dt>
+                          <dd>{event.WorkerID ?? "—"}</dd>
+                          <dt>Occurred at</dt>
+                          <dd>{event.OccurredAt}</dd>
+                        </dl>
+                        <pre className="raw-payload">
+                          {JSON.stringify(event.Payload, null, 2)}
+                        </pre>
+                      </details>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
