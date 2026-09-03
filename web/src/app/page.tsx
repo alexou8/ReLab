@@ -245,7 +245,7 @@ export default async function Overview() {
                     </td>
                     <td className="mono">{time(run.CreatedAt)}</td>
                     <td className="mono">
-                      {duration(run.CreatedAt, run.CompletedAt) ?? "—"}
+                      {duration(run.CreatedAt, run.CompletedAt) ?? "·"}
                     </td>
                   </tr>
                 ))}
@@ -337,7 +337,7 @@ function Verdict({
           <span className="k">Time to recover</span>
           <span className="v">
             {evidence.recoveryMs === null
-              ? "—"
+              ? "·"
               : `${(evidence.recoveryMs / 1000).toFixed(2)}s`}
           </span>
         </li>

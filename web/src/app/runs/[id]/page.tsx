@@ -116,7 +116,7 @@ export default async function RunDetail({
           label="Recovery"
           value={
             evidence.recoveryMs === null
-              ? "—"
+              ? "·"
               : `${(evidence.recoveryMs / 1000).toFixed(2)}s`
           }
         />
@@ -124,7 +124,7 @@ export default async function RunDetail({
       <p className="detail note">
         Every number above is a count of events in this run&rsquo;s journal.
         Recovery is measured from the first fault, lease expiry, task failure or
-        lost worker to the run completing — the same interval{" "}
+        lost worker to the run completing, the same interval{" "}
         <code>relab test</code> asserts on.
       </p>
 
@@ -159,9 +159,9 @@ export default async function RunDetail({
                   {task.Attempt}/{task.MaxAttempts}
                 </td>
                 <td className="mono">
-                  {task.WorkerID ? short(task.WorkerID) : "—"}
+                  {task.WorkerID ? short(task.WorkerID) : "·"}
                 </td>
-                <td className="detail wrap">{task.Error || "—"}</td>
+                <td className="detail wrap">{task.Error || "·"}</td>
               </tr>
             ))}
           </tbody>
@@ -238,9 +238,9 @@ export default async function RunDetail({
                       </span>
                       <code className="event-type">{event.Type}</code>
                     </td>
-                    <td>{event.TaskName || "—"}</td>
+                    <td>{event.TaskName || "·"}</td>
                     <td className="mono">
-                      {event.WorkerID ? short(event.WorkerID) : "—"}
+                      {event.WorkerID ? short(event.WorkerID) : "·"}
                     </td>
                     <td className="detail wrap">
                       <details className="raw">
@@ -256,9 +256,9 @@ export default async function RunDetail({
                           <dt>Sequence</dt>
                           <dd>{event.Seq}</dd>
                           <dt>Task</dt>
-                          <dd>{event.TaskName || "—"}</dd>
+                          <dd>{event.TaskName || "·"}</dd>
                           <dt>Worker</dt>
-                          <dd>{event.WorkerID ?? "—"}</dd>
+                          <dd>{event.WorkerID ?? "·"}</dd>
                           <dt>Occurred at</dt>
                           <dd>{event.OccurredAt}</dd>
                         </dl>

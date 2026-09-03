@@ -1,39 +1,134 @@
 /*
- * A deliberately plain visual system. The dashboard's job is to make a run's
- * history legible during a failure; anything that competes with the data for
- * attention is working against that.
+ * ReLab's visual system.
+ *
+ * The dashboard shows a machine's own record of what it did, so it is set like
+ * one: a character grid, hairline rules, no rounded corners, no shadow, no
+ * gradient. Nothing here is styled to look technical. It is laid out the way
+ * terminal output is laid out, because the content is terminal output.
+ *
+ * The one rule everything else follows from:
+ *
+ *   monospace is what the machine recorded.  sans is what a human says about it.
+ *
+ * Event types, ids, sequence numbers, timestamps, payloads and counts are
+ * always mono. Labels, explanations and verdicts are always sans. A reader can
+ * therefore tell evidence from interpretation without being told, which is the
+ * distinction this whole project rests on.
  */
 
-:root {
-  --bg: #ffffff;
-  --surface: #f7f8fa;
-  --border: #e2e5ea;
-  --text: #14161a;
-  --muted: #5f6672;
-  --accent: #1f5fd0;
-
-  --ok: #1a7f4b;
-  --warn: #a8620a;
-  --bad: #b3261e;
-  --idle: #5f6672;
-
-  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+/*
+ * IBM Plex, self-hosted, latin subset only.
+ *
+ * Not JetBrains Mono, which is the reflex pick for anything terminal-shaped.
+ * Plex was drawn for IBM's engineering documentation, which is what this is:
+ * a machine's record of what it did, and a person's reading of it. The two
+ * faces are one family, so the page holds together while still marking the
+ * difference between the two kinds of statement on it.
+ *
+ * Served from this origin rather than from Google: it removes a third-party
+ * request from every page load, it makes the build hermetic, and the pages
+ * still render on the platform's own mono and sans if a file is missing.
+ * IBM Plex is SIL OFL 1.1; see public/fonts/OFL.txt.
+ */
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/ibm-plex-mono-400.woff2") format("woff2");
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0e1013;
-    --surface: #171a1f;
-    --border: #2a2f37;
-    --text: #e8eaee;
-    --muted: #9aa2ae;
-    --accent: #6ea8fe;
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/ibm-plex-mono-600.woff2") format("woff2");
+}
 
-    --ok: #4ec97f;
-    --warn: #e0a458;
-    --bad: #f2756a;
-    --idle: #9aa2ae;
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/ibm-plex-mono-700.woff2") format("woff2");
+}
+
+/* One variable file covers every sans weight the page uses. */
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 100 700;
+  font-display: swap;
+  src: url("/fonts/ibm-plex-sans-var.woff2") format("woff2-variations");
+}
+
+:root {
+  /* Both themes are real, so the platform is told: scrollbars, form controls
+     and the canvas behind the page follow the one in use. */
+  color-scheme: light dark;
+
+  /* Warm charcoal rather than black. A terminal is a lit surface, and pure
+     #000 with a bright accent is a costume rather than a working ground. */
+  --bg: #131211;
+  --surface: #1b1917;
+  --raised: #232019;
+  --border: #322e29;
+  --rule: #262320;
+  --text: #e7e2d9;
+  --muted: #9c958a;
+  --accent: #85aed6;
+
+  /* The status hues are the ANSI four, desaturated to sit on a warm ground.
+     They are never the only carrier of a state: every status also has a word
+     and a glyph. */
+  --ok: #8cbb6a;
+  --warn: #d99a4e;
+  --bad: #e5776a;
+  --idle: #9c958a;
+
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo,
+    Consolas, monospace;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto,
+    sans-serif;
+
+  /* Mono sits on a fixed scale. In between sizes break the column alignment
+     that makes a log scannable, so there are four and no others. */
+  --t-xs: 11px;
+  --t-sm: 12px;
+  --t-md: 13px;
+  --t-lg: 15px;
+
+  /* A 4px grid, dense by intent: this is a dashboard read during an incident,
+     not a page to be strolled through. */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 24px;
+  --s6: 32px;
+  --s7: 48px;
+}
+
+/*
+ * Light is the same log printed on paper, not a second design. The hues are
+ * the same hues, darkened to hold 4.5:1 on a warm ground.
+ */
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f5f2ea;
+    --surface: #ebe6da;
+    --raised: #e2dcce;
+    --border: #d5cdbd;
+    --rule: #ded7c9;
+    --text: #211f1b;
+    --muted: #665f54;
+    --accent: #1c5a92;
+
+    --ok: #2f6b33;
+    --warn: #855410;
+    --bad: #a63325;
+    --idle: #665f54;
   }
 }
 
@@ -47,9 +142,27 @@ body {
   padding: 0;
   background: var(--bg);
   color: var(--text);
+  font-family: var(--mono);
+  font-size: var(--t-md);
+  /* Tight enough to read as output, loose enough to read as text. */
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Prose is set in sans. It is a person talking, not a record. */
+p,
+li,
+dd,
+.prose {
   font-family: var(--sans);
-  font-size: 15px;
-  line-height: 1.5;
+}
+
+a,
+button,
+summary {
+  /* No 300ms wait for a double-tap that this interface never handles. */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 a {
@@ -60,6 +173,7 @@ a {
 a:hover,
 a:focus-visible {
   text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 /* A visible focus ring on every interactive element: this is a debugging tool,
@@ -69,101 +183,340 @@ a:focus-visible {
   outline-offset: 2px;
 }
 
-.layout {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 24px 20px 64px;
+code,
+pre {
+  font-family: var(--mono);
 }
 
+/* ---------------------------------------------------------------------------
+   Frame
+   ------------------------------------------------------------------------- */
+
+.layout {
+  max-width: 1180px;
+  margin: 0 auto;
+  /* Bottom padding clears the fixed status line. */
+  padding: var(--s5) var(--s5) 72px;
+}
+
+/*
+ * The masthead is a command line. The product name is the program, the tabs
+ * are what you can ask it for. It is not a logo, and it is not centred.
+ */
 header.masthead {
   border-bottom: 1px solid var(--border);
-  margin-bottom: 24px;
-  padding-bottom: 16px;
+  margin-bottom: var(--s5);
+  padding-bottom: var(--s3);
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: var(--s3) var(--s5);
   align-items: baseline;
   justify-content: space-between;
 }
 
 header.masthead h1 {
-  font-size: 18px;
+  font-family: var(--mono);
+  font-size: var(--t-lg);
+  font-weight: 600;
   margin: 0;
-  letter-spacing: -0.01em;
+  letter-spacing: 0.02em;
+}
+
+/* The prompt mark before the product name. Decorative in the sense that a
+   prompt is decorative: it says where you are. */
+header.masthead h1::before {
+  content: "$ ";
+  color: var(--muted);
+  font-weight: 400;
 }
 
 header.masthead p {
-  margin: 4px 0 0;
+  margin: 2px 0 0;
+  font-family: var(--sans);
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--t-md);
 }
 
 nav.tabs {
   display: flex;
-  gap: 16px;
-  font-size: 14px;
+  flex-wrap: wrap;
+  gap: var(--s1);
+  font-size: var(--t-md);
+}
+
+/* Tabs are bracketed the way a CLI writes a choice. The brackets are content,
+   not borders, so they wrap and select with the text. */
+nav.tabs a {
+  padding: 6px var(--s2);
+  color: var(--muted);
+}
+
+nav.tabs a::before {
+  content: "[";
+  color: var(--rule);
+}
+
+nav.tabs a::after {
+  content: "]";
+  color: var(--rule);
+}
+
+nav.tabs a:hover {
+  color: var(--text);
+  text-decoration: none;
+}
+
+nav.tabs a[aria-current="page"] {
+  color: var(--text);
+  font-weight: 600;
+}
+
+nav.tabs a[aria-current="page"]::before,
+nav.tabs a[aria-current="page"]::after {
+  color: var(--accent);
+}
+
+.nav-out {
+  color: var(--muted);
+}
+
+/*
+ * The status line. A terminal user looks at the bottom of the window to find
+ * out what session they are in, so that is where this says whether the data is
+ * live or recorded. It is out of the way and never in doubt.
+ */
+.statusline {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s3);
+  padding: 6px var(--s4);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: var(--t-sm);
+  color: var(--muted);
+}
+
+.statusline .mode-label {
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--bg);
+  background: var(--idle);
+  padding: 1px 7px;
+}
+
+.statusline.mode-live .mode-label {
+  background: var(--ok);
+}
+
+.statusline.mode-demo .mode-label {
+  background: var(--warn);
+}
+
+.statusline .sep {
+  color: var(--rule);
+}
+
+/* On a narrow screen the status line would eat a third of the viewport, so it
+   scrolls back into the flow at the end of the document. */
+@media (max-width: 720px) {
+  .statusline {
+    position: static;
+  }
+  .layout {
+    padding-bottom: var(--s5);
+  }
 }
 
 h2 {
-  font-size: 15px;
-  margin: 32px 0 12px;
+  /* The timeline is linked to by id from the filter bar; without this the
+     heading lands under the masthead. */
+  scroll-margin-top: var(--s4);
+  font-family: var(--mono);
+  font-size: var(--t-sm);
+  margin: var(--s6) 0 var(--s3);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.12em;
+  font-weight: 600;
   color: var(--muted);
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: var(--s2);
 }
 
 h2:first-of-type {
   margin-top: 0;
 }
 
-/* Counts */
+section {
+  margin-bottom: var(--s6);
+}
+
+/* ---------------------------------------------------------------------------
+   Hero
+   ------------------------------------------------------------------------- */
+
+.hero {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: var(--s5);
+  margin-bottom: var(--s6);
+}
+
+/*
+ * Set in mono at display size, tight. A monospace face at 44px is unusual
+ * enough to be the page's one loud thing, and it is honest: this product's
+ * output is text.
+ */
+.hero-title {
+  font-family: var(--mono);
+  font-size: clamp(26px, 5.2vw, 44px);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  font-weight: 600;
+  text-wrap: balance;
+  margin: 0 0 var(--s3);
+  text-transform: none;
+  color: var(--text);
+  border: 0;
+  padding: 0;
+}
+
+.hero-copy {
+  text-wrap: pretty;
+  font-family: var(--sans);
+  max-width: 62ch;
+  font-size: var(--t-lg);
+  line-height: 1.6;
+  margin: 0 0 var(--s4);
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+  margin: 0 0 var(--s4);
+}
+
+/* Square, bordered, no fill gradient and no shadow. A button in a terminal is
+   a bracketed word; this is the smallest step from that which still reads as a
+   target on a touch screen. */
+.cta {
+  display: inline-block;
+  padding: 10px 16px;
+  min-height: 44px;
+  line-height: 24px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--bg);
+  font-family: var(--mono);
+  font-size: var(--t-md);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  transition: background-color 120ms linear, color 120ms linear;
+}
+
+.cta::before {
+  content: "> ";
+  opacity: 0.6;
+}
+
+.cta:hover,
+.cta:focus-visible {
+  text-decoration: none;
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--bg);
+}
+
+.cta-quiet {
+  background: transparent;
+  color: var(--accent);
+  border-color: var(--border);
+}
+
+.cta-quiet:hover,
+.cta-quiet:focus-visible {
+  background: transparent;
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.lead {
+  font-family: var(--sans);
+  max-width: 74ch;
+  font-size: var(--t-lg);
+  margin: 0 0 var(--s4);
+}
+
+/* ---------------------------------------------------------------------------
+   Counts
+   ------------------------------------------------------------------------- */
+
+/* Borders on the cells rather than a gap over a coloured ground: an auto-fit
+   grid leaves empty cells on its last row, and a coloured ground shows them as
+   blocks that look like counts with no number in them. Negative margins
+   collapse the doubled borders between neighbours. */
 .counts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
 }
 
 .count {
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 12px 14px;
-  background: var(--surface);
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--rule);
+  margin: -1px 0 0 -1px;
 }
 
 .count .value {
-  font-size: 26px;
+  font-size: 22px;
   font-variant-numeric: tabular-nums;
   font-family: var(--mono);
+  line-height: 1.2;
 }
 
 .count .label {
-  font-size: 12px;
+  font-family: var(--sans);
+  font-size: var(--t-sm);
   color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.02em;
+  margin-top: 2px;
 }
 
-/* Tables */
+/* ---------------------------------------------------------------------------
+   Tables. These are the log itself, so they are set as a log: mono, tight
+   leading, columns that line up down the page.
+   ------------------------------------------------------------------------- */
+
 table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 14px;
+  font-family: var(--mono);
+  font-size: var(--t-md);
 }
 
 th,
 td {
   text-align: left;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--border);
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--rule);
   vertical-align: top;
 }
 
-th {
-  font-size: 12px;
+thead th {
+  font-family: var(--mono);
+  font-size: var(--t-xs);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.1em;
   color: var(--muted);
   font-weight: 600;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  white-space: nowrap;
 }
 
 td.mono,
@@ -172,16 +525,42 @@ th.mono {
   font-variant-numeric: tabular-nums;
 }
 
-.table-scroll {
-  overflow-x: auto;
+tbody tr:hover {
+  background: var(--surface);
 }
 
-/* Status */
+.table-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--rule);
+}
+
+.table-scroll table {
+  border: 0;
+}
+
+.table-scroll tbody tr:last-child td,
+.table-scroll tbody tr:last-child th {
+  border-bottom: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Status. Word, colour and glyph. Any two can be missing and the state still
+   arrives.
+   ------------------------------------------------------------------------- */
+
 .status {
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: var(--t-sm);
   font-weight: 600;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.status-glyph {
+  display: inline-block;
+  width: 1.2ch;
+  margin-right: 0.6ch;
+  font-weight: 700;
 }
 
 .status-ok {
@@ -197,55 +576,73 @@ th.mono {
   color: var(--idle);
 }
 
-/* Empty and error states */
+/* ---------------------------------------------------------------------------
+   Notices, empty and error states
+   ------------------------------------------------------------------------- */
+
 .notice {
   border: 1px solid var(--border);
   border-left: 3px solid var(--warn);
-  border-radius: 4px;
   background: var(--surface);
-  padding: 14px 16px;
-  font-size: 14px;
+  padding: var(--s3) var(--s4);
+  font-size: var(--t-md);
 }
 
 .notice h3 {
-  margin: 0 0 6px;
-  font-size: 14px;
+  margin: 0 0 var(--s1);
+  font-family: var(--mono);
+  font-size: var(--t-md);
+  letter-spacing: 0.02em;
 }
 
 .notice p {
   margin: 0;
+  font-family: var(--sans);
   color: var(--muted);
+  max-width: 80ch;
 }
 
-.notice code {
-  font-family: var(--mono);
-  font-size: 13px;
+.notice p + p {
+  margin-top: var(--s2);
+}
+
+.notice-ok {
+  border-left-color: var(--ok);
+}
+
+.notice-bad {
+  border-left-color: var(--bad);
 }
 
 .empty {
+  font-family: var(--sans);
   color: var(--muted);
-  font-size: 14px;
-  padding: 16px 0;
+  font-size: var(--t-md);
+  padding: var(--s4) 0;
 }
 
-/* Run detail */
+/* ---------------------------------------------------------------------------
+   Run facts
+   ------------------------------------------------------------------------- */
+
 .facts {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px 24px;
-  margin-bottom: 8px;
+  gap: var(--s3) var(--s5);
+  margin-bottom: var(--s3);
+  padding: var(--s3) 0;
+  border-bottom: 1px solid var(--rule);
 }
 
 .fact .label {
-  font-size: 12px;
+  font-family: var(--sans);
+  font-size: var(--t-sm);
   color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
 }
 
 .fact .value {
   font-family: var(--mono);
-  font-size: 14px;
+  font-size: var(--t-md);
   /* Breaks at a hyphen or between words, not mid-token: a run id split as
      "...-a40 0-a9e..." reads as two different ids. */
   overflow-wrap: break-word;
@@ -253,34 +650,36 @@ th.mono {
 
 .detail {
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--t-sm);
   font-family: var(--mono);
 }
 
 .back {
-  font-size: 13px;
+  font-family: var(--mono);
+  font-size: var(--t-sm);
   display: inline-block;
-  margin-bottom: 16px;
+  margin-bottom: var(--s4);
+  color: var(--muted);
 }
 
-/* Skip link: visible only when focused, which is when it is useful. */
+/* ---------------------------------------------------------------------------
+   Utilities
+   ------------------------------------------------------------------------- */
+
 .skip {
   position: absolute;
   left: -9999px;
 }
 
 .skip:focus {
-  left: 12px;
-  top: 12px;
+  left: var(--s3);
+  top: var(--s3);
   z-index: 10;
   background: var(--bg);
   border: 1px solid var(--accent);
-  border-radius: 4px;
-  padding: 8px 12px;
+  padding: var(--s2) var(--s3);
 }
 
-/* Available to screen readers, not laid out. Used for table captions, which
-   say what a dense table is before a reader is inside it. */
 .sr-only {
   position: absolute;
   width: 1px;
@@ -293,105 +692,85 @@ th.mono {
   border: 0;
 }
 
-/* Mode banner: which deployment this is, said once. */
-.mode {
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--muted);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--idle);
-  border-radius: 4px;
-  background: var(--surface);
-  padding: 10px 14px;
-  margin: 0 0 24px;
-}
-
-.mode-demo {
-  border-left-color: var(--warn);
-}
-
-.mode-live {
-  border-left-color: var(--ok);
-}
-
-.mode-label {
-  font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text);
-  margin-right: 10px;
-}
-
-.mode code,
-.explainer code,
-.note code {
-  font-family: var(--mono);
-  font-size: 0.92em;
-}
-
-/* The one prose block in the dashboard: what ReLab is, for a reader who has
-   never seen it. Measure is capped because a 1100px line of prose is unreadable
-   even when a 1100px table is not. */
+/* Prose blocks. Measure is capped because a 1180px line of prose is unreadable
+   even when a 1180px table is not. */
 .explainer p {
-  max-width: 70ch;
-  margin: 0 0 10px;
+  max-width: 72ch;
+  margin: 0 0 var(--s2);
+  font-size: var(--t-lg);
 }
 
 .explainer p:last-child {
   margin-bottom: 0;
 }
 
-/* The explainer's qualifying paragraph is prose, not data, so it keeps the
-   body font even though it is muted like a detail cell. */
 .explainer .detail {
   font-family: var(--sans);
-  font-size: 14px;
-  max-width: 70ch;
+  font-size: var(--t-md);
+  max-width: 72ch;
 }
 
 /* A note under a table or a set of counts, saying where the numbers come from.
    These are the sentences that keep a metric from being taken on trust. */
 .note {
-  max-width: 80ch;
-  margin: 10px 0 0;
-  line-height: 1.6;
+  max-width: 84ch;
+  margin: var(--s2) 0 0;
   font-family: var(--sans);
+  font-size: var(--t-md);
+  color: var(--muted);
 }
 
-/* Filters. Links rather than controls, so a filtered view is a URL and the
-   page needs no JavaScript to produce one. */
+.note code,
+.explainer code,
+.notice code,
+.statusline code {
+  font-family: var(--mono);
+  font-size: 0.94em;
+  color: var(--text);
+}
+
+/* ---------------------------------------------------------------------------
+   Filters. Links rather than controls, so a filtered view is a URL and the
+   page needs no JavaScript to produce one.
+   ------------------------------------------------------------------------- */
+
 .filters {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 12px;
+  gap: var(--s1);
+  margin-bottom: var(--s3);
 }
 
 .filter {
-  font-size: 12px;
+  font-size: var(--t-sm);
   font-family: var(--mono);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 3px 9px;
+  border: 1px solid var(--rule);
+  padding: 6px 10px;
+  min-height: 32px;
   color: var(--muted);
-  background: var(--surface);
+  background: transparent;
   text-decoration: none;
   white-space: nowrap;
+  transition: border-color 120ms linear, color 120ms linear;
 }
 
 .filter:hover {
-  border-color: var(--accent);
+  border-color: var(--muted);
+  color: var(--text);
   text-decoration: none;
 }
 
 .filter-on {
   color: var(--text);
   border-color: var(--accent);
-  /* Not colour alone: the selected filter is also the only bold one, so it is
-     still identifiable in monochrome. */
+  /* Not colour alone: the selected filter is also the only bold one, and the
+     only one carrying the marker below. */
   font-weight: 600;
+}
+
+.filter-on::before {
+  content: "* ";
+  color: var(--accent);
 }
 
 .filter-count {
@@ -407,18 +786,23 @@ th.mono {
    task or worker a cell belongs to. It should not look like a header. */
 th.row-name {
   font-weight: 400;
-  font-size: 14px;
+  font-size: var(--t-md);
   text-transform: none;
   letter-spacing: 0;
   color: var(--text);
+  background: transparent;
+  border-bottom: 1px solid var(--rule);
 }
 
-/* Timeline */
+/* ---------------------------------------------------------------------------
+   Timeline
+   ------------------------------------------------------------------------- */
+
 .timeline {
   /* Below this the columns squeeze until a payload wraps to five lines and the
      rows stop being scannable. Scrolling sideways through a sequence is much
      better than reading a sequence with gaps in it. */
-  min-width: 46rem;
+  min-width: 52rem;
 }
 
 .timeline td {
@@ -426,8 +810,8 @@ th.row-name {
   padding-bottom: 6px;
 }
 
-/* Trouble rows are marked by a rule down the left as well as by the amber
-   status word, so they are findable when scrolling and identifiable without
+/* Trouble rows are marked by a rule down the left as well as by the weight of
+   the label, so they are findable when scrolling and identifiable without
    colour. */
 .row-trouble td:first-child {
   box-shadow: inset 2px 0 0 var(--warn);
@@ -439,55 +823,455 @@ td.wrap {
   min-width: 16ch;
   /* An idempotency key is long and nobody reads it across the full width of a
      wide screen; three lines of it is enough to recognise. */
-  max-width: 52ch;
+  max-width: 54ch;
 }
 
-.notice-ok {
-  border-left-color: var(--ok);
+/* The human reading, then the machine's own word for it. Both, always, in that
+   order, in their two faces. */
+.event-label {
+  display: block;
+  font-family: var(--sans);
+  font-size: var(--t-md);
+  color: var(--text);
 }
 
-.notice-bad {
-  border-left-color: var(--bad);
+.event-trouble {
+  font-weight: 600;
 }
 
-.notice p + p {
-  margin-top: 8px;
+.event-type {
+  font-family: var(--mono);
+  font-size: var(--t-xs);
+  color: var(--muted);
+  letter-spacing: 0.04em;
 }
 
-.count .value {
-  /* Counts are compared down a column, so they line up whatever their width. */
+/* A disclosure rather than a modal or a tooltip: it needs no JavaScript, it
+   prints, it is keyboard-operable by default, and several can be open at once
+   while comparing two attempts. */
+.raw > summary {
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: var(--t-sm);
+  color: var(--muted);
+  list-style: none;
+}
+
+.raw > summary::-webkit-details-marker {
+  display: none;
+}
+
+.raw > summary::before {
+  content: "+ ";
+  color: var(--accent);
+}
+
+.raw[open] > summary::before {
+  content: "- ";
+}
+
+.raw > summary:hover {
+  color: var(--text);
+}
+
+.raw[open] > summary {
+  color: var(--text);
+  margin-bottom: var(--s2);
+}
+
+.raw-meaning {
+  margin: 0 0 var(--s2);
+  font-family: var(--sans);
+  font-size: var(--t-md);
+  max-width: 62ch;
+}
+
+.raw-fields {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px var(--s3);
+  margin: 0 0 var(--s2);
+  font-size: var(--t-sm);
+}
+
+.raw-fields dt {
+  font-family: var(--sans);
+  color: var(--muted);
+}
+
+.raw-fields dd {
+  margin: 0;
+  font-family: var(--mono);
+  overflow-wrap: anywhere;
+}
+
+.raw-payload {
+  margin: 0;
+  padding: var(--s2) var(--s3);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  font-family: var(--mono);
+  font-size: var(--t-xs);
+  line-height: 1.55;
+  overflow-x: auto;
+  max-height: 18rem;
+}
+
+/* ---------------------------------------------------------------------------
+   The story: one run's failure and recovery, as milestones.
+
+   Set as terminal output with a rail down the left. The rail is a real
+   sequence, so it is drawn as one continuous line rather than as separate
+   cards: the events happened in a row, and the layout should not suggest they
+   are independent.
+   ------------------------------------------------------------------------- */
+
+.story {
+  list-style: none;
+  margin: 0 0 var(--s4);
+  padding: 0;
+  border: 1px solid var(--rule);
+  border-left: 1px solid var(--rule);
+  background: var(--surface);
+}
+
+.step {
+  position: relative;
+  padding: var(--s3) var(--s4) var(--s3) var(--s6);
+  border-bottom: 1px solid var(--rule);
+}
+
+.step:last-child {
+  border-bottom: 0;
+}
+
+/* The marker is a character, not a dot: this is a log, and a log marks its
+   lines with characters. It also survives a monochrome print, which a coloured
+   dot does not. */
+.step::before {
+  position: absolute;
+  left: var(--s4);
+  top: var(--s3);
+  font-family: var(--mono);
+  font-weight: 700;
+  content: "·";
+  color: var(--idle);
+}
+
+.step-break::before {
+  content: "x";
+  color: var(--bad);
+}
+
+.step-recovery::before {
+  content: "!";
+  color: var(--warn);
+}
+
+.step-ok::before {
+  content: "+";
+  color: var(--ok);
+}
+
+.step-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--s3);
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.step-label {
+  font-family: var(--sans);
+  font-size: var(--t-lg);
+  font-weight: 600;
+}
+
+/* The break is the one step whose label is underlined, so the turn of the
+   story is visible without colour. */
+.step-break .step-label {
+  text-decoration: underline;
+  text-decoration-color: var(--bad);
+  text-underline-offset: 4px;
+}
+
+.step-seq {
+  font-family: var(--mono);
+  font-size: var(--t-sm);
+  color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
 
-/* Narrow screens. The tables scroll rather than reflow: a timeline whose rows
+.step-type {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: var(--t-xs);
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  margin-top: 2px;
+}
+
+.step-meaning {
+  margin: var(--s1) 0 0;
+  font-family: var(--sans);
+  font-size: var(--t-md);
+  color: var(--muted);
+  max-width: 74ch;
+}
+
+/* ---------------------------------------------------------------------------
+   Verdict
+   ------------------------------------------------------------------------- */
+
+.verdict {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--idle);
+  background: var(--surface);
+  padding: var(--s3) var(--s4);
+}
+
+.verdict-ok {
+  border-left-color: var(--ok);
+}
+
+.verdict-bad {
+  border-left-color: var(--bad);
+}
+
+.verdict-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s3);
+  margin: 0 0 var(--s3);
+  font-family: var(--mono);
+}
+
+.verdict-word {
+  font-family: var(--mono);
+  font-size: var(--t-lg);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.verdict-ok .verdict-word {
+  color: var(--ok);
+}
+
+.verdict-bad .verdict-word {
+  color: var(--bad);
+}
+
+.verdict-word::before {
+  margin-right: 0.8ch;
+}
+
+.verdict-ok .verdict-word::before {
+  content: "+";
+}
+
+.verdict-bad .verdict-word::before {
+  content: "x";
+}
+
+.verdict-facts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0 var(--s5);
+}
+
+.verdict-facts li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--s2);
+  border-bottom: 1px solid var(--rule);
+  padding: 5px 0;
+  font-size: var(--t-md);
+}
+
+/* Leaders, so a label and its number stay associated across a wide gap. The
+   dots are drawn, not typed, so they never get selected or read aloud. */
+.verdict-facts .k {
+  font-family: var(--sans);
+  color: var(--muted);
+  flex: 0 1 auto;
+}
+
+.verdict-facts li::before {
+  content: "";
+  flex: 1 1 auto;
+  order: 1;
+  margin: 0 var(--s2);
+  border-bottom: 1px dotted var(--rule);
+  transform: translateY(-3px);
+}
+
+.verdict-facts .v {
+  order: 2;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------------------
+   Overview prose blocks
+   ------------------------------------------------------------------------- */
+
+.reasons {
+  font-family: var(--sans);
+  max-width: 74ch;
+  margin: 0 0 var(--s3);
+  padding: 0;
+  list-style: none;
+}
+
+/* A question in a list of open questions is marked with a query character,
+   which is what it is. */
+.reasons li {
+  position: relative;
+  padding-left: 3ch;
+  margin-bottom: var(--s1);
+  font-size: var(--t-lg);
+}
+
+.reasons li::before {
+  content: "?";
+  position: absolute;
+  left: 0;
+  font-family: var(--mono);
+  color: var(--muted);
+}
+
+/*
+ * The five stages of a run. Numbered because it genuinely is a sequence: stage
+ * three cannot happen before stage two, and the numbers are how the reader
+ * knows that.
+ */
+.pipeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1px;
+  background: var(--rule);
+  border: 1px solid var(--rule);
+}
+
+.pipeline-step {
+  display: flex;
+  gap: var(--s3);
+  background: var(--bg);
+  padding: var(--s3) var(--s4);
+}
+
+.pipeline-n {
+  font-family: var(--mono);
+  color: var(--muted);
+  font-size: var(--t-sm);
+  padding-top: 2px;
+}
+
+.pipeline-step h3 {
+  margin: 0 0 2px;
+  font-family: var(--sans);
+  font-size: var(--t-md);
+  font-weight: 600;
+}
+
+.pipeline-step p {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: var(--t-md);
+  color: var(--muted);
+  max-width: 74ch;
+}
+
+@media (min-width: 900px) {
+  .pipeline {
+    grid-template-columns: repeat(5, 1fr);
+  }
+  .pipeline-step {
+    flex-direction: column;
+    gap: var(--s2);
+  }
+}
+
+.links {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--rule);
+}
+
+.links li {
+  padding: var(--s2) var(--s3);
+  border-bottom: 1px solid var(--rule);
+  font-family: var(--mono);
+  font-size: var(--t-md);
+}
+
+.links li:last-child {
+  border-bottom: 0;
+}
+
+.links .detail {
+  font-family: var(--sans);
+}
+
+/* ---------------------------------------------------------------------------
+   Narrow screens. The tables scroll rather than reflow: a timeline whose rows
    have been rearranged to fit is no longer a sequence, and the sequence is the
-   evidence. Everything around them stacks. */
+   evidence. Everything around them stacks.
+   ------------------------------------------------------------------------- */
+
 @media (max-width: 640px) {
   .layout {
-    padding: 16px 12px 48px;
+    padding: var(--s4) var(--s3) var(--s5);
   }
 
   header.masthead {
     flex-direction: column;
-    gap: 8px;
+    gap: var(--s2);
+    align-items: stretch;
+  }
+
+  nav.tabs {
+    margin-left: -var(--s2);
   }
 
   .counts {
-    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   }
 
   .count .value {
-    font-size: 20px;
+    font-size: 19px;
   }
 
   table {
-    font-size: 13px;
+    font-size: var(--t-sm);
   }
 
   /* Squeezing a six-column table into 390px turns every cell into a column of
      single words. Scrolling it sideways keeps the rows readable as rows. */
   .table-scroll table {
     min-width: 34rem;
+  }
+
+  .hero-actions .cta {
+    flex: 1 1 auto;
+    text-align: center;
+  }
+
+  .step {
+    padding-left: var(--s5);
+  }
+
+  .step::before {
+    left: var(--s3);
   }
 }
 
@@ -502,380 +1286,4 @@ td.wrap {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
-}
-
-/* ---------------------------------------------------------------------------
-   The product story.
-
-   These styles serve the overview's argument: what broke, what the system did,
-   what can be proved. They are deliberately the same ink and the same borders
-   as the tables. A landing page that looked like a different product from the
-   dashboard it introduces would undercut the thing it is introducing.
-   ------------------------------------------------------------------------- */
-
-section {
-  margin-bottom: 40px;
-}
-
-.hero {
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 24px;
-}
-
-.hero-title {
-  font-size: clamp(28px, 5vw, 40px);
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-  margin: 0 0 12px;
-  text-transform: none;
-  color: var(--text);
-}
-
-.hero-copy {
-  max-width: 62ch;
-  font-size: 16px;
-  margin: 0 0 20px;
-  color: var(--text);
-}
-
-.hero-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin: 0 0 16px;
-}
-
-.cta {
-  display: inline-block;
-  /* 44px of target on a phone, without a pill. */
-  padding: 11px 18px;
-  border: 1px solid var(--accent);
-  border-radius: 4px;
-  background: var(--accent);
-  color: var(--bg);
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.cta:hover,
-.cta:focus-visible {
-  text-decoration: none;
-  filter: brightness(1.08);
-}
-
-.cta-quiet {
-  background: transparent;
-  color: var(--accent);
-  border-color: var(--border);
-}
-
-.lead {
-  max-width: 72ch;
-  font-size: 15px;
-  margin: 0 0 16px;
-}
-
-/* The failure-to-recovery chain. An ordered list because it is one: the reader
-   is being shown a sequence, and the numbers on it are real sequence numbers. */
-.story {
-  list-style: none;
-  margin: 0 0 20px;
-  padding: 0;
-  border-left: 1px solid var(--border);
-}
-
-.step {
-  position: relative;
-  padding: 10px 0 10px 20px;
-}
-
-/* The tick on the rail marks where in the chain this step sits. It is a
-   position, not decoration: the break and the recovery steps are marked
-   differently so the shape of the run is visible before any of it is read. */
-.step::before {
-  content: "";
-  position: absolute;
-  left: -4px;
-  top: 17px;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--idle);
-}
-
-.step-break::before {
-  background: var(--bad);
-}
-.step-recovery::before {
-  background: var(--warn);
-}
-.step-ok::before {
-  background: var(--ok);
-}
-
-.step-head {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  align-items: baseline;
-  justify-content: space-between;
-}
-
-.step-label {
-  font-size: 15px;
-  font-weight: 600;
-}
-
-/* Not colour alone: a break is also the only step whose label is underlined,
-   and every step still says its own event type. */
-.step-break .step-label {
-  text-decoration: underline;
-  text-decoration-color: var(--bad);
-  text-underline-offset: 4px;
-}
-
-.step-seq {
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.step-type {
-  display: inline-block;
-  font-family: var(--mono);
-  font-size: 12px;
-  color: var(--muted);
-  margin-top: 2px;
-}
-
-.step-meaning {
-  margin: 4px 0 0;
-  font-size: 13px;
-  color: var(--muted);
-  max-width: 70ch;
-}
-
-/* The verdict. One word, then the counts behind it. */
-.verdict {
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--idle);
-  border-radius: 4px;
-  background: var(--surface);
-  padding: 14px 16px;
-}
-
-.verdict-ok {
-  border-left-color: var(--ok);
-}
-.verdict-bad {
-  border-left-color: var(--bad);
-}
-
-.verdict-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 12px;
-  margin: 0 0 10px;
-}
-
-.verdict-word {
-  font-family: var(--mono);
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-}
-
-.verdict-ok .verdict-word {
-  color: var(--ok);
-}
-.verdict-bad .verdict-word {
-  color: var(--bad);
-}
-
-.verdict-facts {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 6px 20px;
-}
-
-.verdict-facts li {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  border-bottom: 1px solid var(--border);
-  padding: 4px 0;
-  font-size: 13px;
-}
-
-.verdict-facts .k {
-  color: var(--muted);
-}
-
-.verdict-facts .v {
-  font-family: var(--mono);
-  font-variant-numeric: tabular-nums;
-}
-
-.reasons {
-  max-width: 72ch;
-  margin: 0 0 12px;
-  padding-left: 20px;
-}
-
-.reasons li {
-  margin-bottom: 4px;
-}
-
-/* The five things a ReLab run does, numbered. */
-.pipeline {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 1px;
-  background: var(--border);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.pipeline-step {
-  display: flex;
-  gap: 14px;
-  background: var(--bg);
-  padding: 12px 14px;
-}
-
-.pipeline-n {
-  color: var(--muted);
-  font-size: 13px;
-  padding-top: 2px;
-}
-
-.pipeline-step h3 {
-  margin: 0 0 2px;
-  font-size: 14px;
-}
-
-.pipeline-step p {
-  margin: 0;
-  font-size: 13px;
-  color: var(--muted);
-  max-width: 70ch;
-}
-
-@media (min-width: 900px) {
-  .pipeline {
-    grid-template-columns: repeat(5, 1fr);
-  }
-  .pipeline-step {
-    flex-direction: column;
-    gap: 6px;
-  }
-}
-
-.links {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.links li {
-  padding: 6px 0;
-  border-bottom: 1px solid var(--border);
-  font-size: 14px;
-}
-
-/* Timeline: plain language over the event type, technical detail on demand. */
-.event-label {
-  display: block;
-  font-size: 14px;
-}
-
-.event-trouble {
-  font-weight: 600;
-}
-
-.event-type {
-  font-family: var(--mono);
-  font-size: 11px;
-  color: var(--muted);
-  letter-spacing: 0.02em;
-}
-
-/* A disclosure rather than a modal or a tooltip: it needs no JavaScript, it
-   prints, it is keyboard-operable by default, and several can be open at once
-   while comparing two attempts. */
-.raw > summary {
-  cursor: pointer;
-  font-family: var(--mono);
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.raw > summary:hover {
-  color: var(--text);
-}
-
-.raw[open] > summary {
-  color: var(--text);
-  margin-bottom: 6px;
-}
-
-.raw-meaning {
-  margin: 0 0 6px;
-  font-family: var(--sans);
-  font-size: 13px;
-  max-width: 60ch;
-}
-
-.raw-fields {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: 2px 10px;
-  margin: 0 0 6px;
-  font-size: 12px;
-}
-
-.raw-fields dt {
-  color: var(--muted);
-}
-
-.raw-fields dd {
-  margin: 0;
-  font-family: var(--mono);
-  overflow-wrap: anywhere;
-}
-
-.raw-payload {
-  margin: 0;
-  padding: 8px 10px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  font-family: var(--mono);
-  font-size: 11px;
-  line-height: 1.5;
-  overflow-x: auto;
-  max-height: 18rem;
-}
-
-@media (max-width: 640px) {
-  .hero-actions .cta {
-    flex: 1 1 auto;
-    text-align: center;
-  }
-
-  .verdict-facts li {
-    font-size: 12px;
-  }
-}
-
-/* A link out of the dashboard sits apart from the section tabs, which are all
-   places inside it. */
-.nav-out {
-  color: var(--muted);
 }

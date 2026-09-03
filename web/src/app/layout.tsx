@@ -1,5 +1,5 @@
-import type { Metadata } from "next";
-import { ModeBanner } from "./mode-banner";
+import type { Metadata, Viewport } from "next";
+import { StatusLine } from "./mode-banner";
 import { Nav } from "./nav";
 import "./globals.css";
 
@@ -7,6 +7,15 @@ export const metadata: Metadata = {
   title: "ReLab",
   description:
     "ReLab breaks workflows on purpose and records whether they recover. Read-only view of runs, tasks, events and workers.",
+};
+
+// The browser chrome takes the page's own ground in each theme, so the address
+// bar does not sit as a bright band above a dark page.
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f5f2ea" },
+    { media: "(prefers-color-scheme: dark)", color: "#131211" },
+  ],
 };
 
 export default function RootLayout({
@@ -31,9 +40,9 @@ export default function RootLayout({
             </div>
             <Nav />
           </header>
-          <ModeBanner />
           <main id="main">{children}</main>
         </div>
+        <StatusLine />
       </body>
     </html>
   );

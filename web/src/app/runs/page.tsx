@@ -93,7 +93,7 @@ export default async function Runs({
                   <td className="mono">
                     <Link href={`/runs/${run.ID}`}>{short(run.ID, 12)}</Link>
                   </td>
-                  <td>{run.ScenarioName || <span className="detail">—</span>}</td>
+                  <td>{run.ScenarioName || <span className="detail">·</span>}</td>
                   <td className="mono">{run.Seed}</td>
                   <td className="mono">{time(run.CreatedAt)}</td>
                   <td className="mono">
