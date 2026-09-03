@@ -12,11 +12,19 @@ versioned workflow code. What it has is a way to kill a worker mid-task and get
 a machine-checkable answer to "did that actually recover, and did it cost a
 duplicate side effect?"
 
-**Try it without installing anything:** the dashboard deploys on its own and
-serves a recording of five real runs — two of them with a worker killed by
-`SIGKILL` mid-task — labelled as a recording on every page. `docs/deployment.md`
-§3 is the whole setup. The recording is made by `scripts/record-demo.sh`, so it
-is an export of what actually happened rather than a fixture.
+**[See it without installing anything → relabca.vercel.app](https://relabca.vercel.app)**
+
+The dashboard runs there on its own, serving a recording of five real runs — two
+of them with a worker killed by `SIGKILL` mid-task — labelled as a recording on
+every page. It is an export of what actually happened, made by
+`scripts/record-demo.sh`, not a fixture written to look plausible.
+
+The run worth opening first is
+[worker-crash-after-effect](https://relabca.vercel.app/runs/96ea5bfd-1536-42c2-ac1b-72b7101efeb7?events=recovery):
+a worker killed after it had already charged a customer but before it could
+acknowledge the task. Four events tell the whole story — the worker lost, the
+lease expired, the task requeued, the charge suppressed — and the run succeeded
+without charging twice.
 
 ---
 
