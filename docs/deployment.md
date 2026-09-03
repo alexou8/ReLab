@@ -104,6 +104,9 @@ make check
 
 ## 3. The Vercel project
 
+Deployed at **<https://relabca.vercel.app>**, serving the recording with no
+backend behind it.
+
 | Setting | Value | Why |
 |---|---|---|
 | Framework | Next.js | Detected; pinned in `web/vercel.json` |
@@ -326,8 +329,8 @@ telemetry is diagnostic.
 Stated plainly, because a deployment guide that only lists what works is not
 one.
 
-- **The dashboard on Vercel shows a recording by default.** It is real and it is
-  labelled, but it is not live.
+- **The dashboard on Vercel shows a recording.** It is real and it is labelled,
+  but it is not live, and <https://relabca.vercel.app> has no backend behind it.
 - **The API has no authentication.** v1 non-goal. It bounds where a control
   plane can be exposed.
 - **Workers cannot run on Vercel**, and no amount of configuration changes that.
