@@ -1287,3 +1287,201 @@ td.wrap {
     scroll-behavior: auto !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Glossary. Definition lists rather than a table: these are prose, they wrap
+   at different lengths, and a table would force a column width on a one-line
+   definition and a five-line one alike.
+   ------------------------------------------------------------------------- */
+
+.glossary {
+  margin: var(--s3) 0 0;
+  border-top: 1px solid var(--rule);
+}
+
+.gterm {
+  display: grid;
+  grid-template-columns: minmax(0, 22ch) minmax(0, 1fr);
+  gap: var(--s4);
+  padding: var(--s3) 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.gterm dt {
+  font-family: var(--sans);
+  font-size: var(--t-md);
+  font-weight: 600;
+  color: var(--text);
+  /* The label and its event type stack when the column is narrow. */
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+  align-items: flex-start;
+}
+
+.gterm dd {
+  margin: 0;
+  max-width: 72ch;
+  font-family: var(--sans);
+  font-size: var(--t-md);
+  color: var(--muted);
+}
+
+.gterm dd em {
+  font-style: normal;
+  color: var(--text);
+}
+
+.gtype {
+  font-family: var(--mono);
+  font-size: var(--t-xs);
+  letter-spacing: 0.02em;
+  color: var(--accent);
+  word-break: break-word;
+}
+
+.glossary-tight .gterm {
+  grid-template-columns: minmax(0, 22ch) minmax(0, 1fr);
+  padding: var(--s2) 0;
+}
+
+/* One column on a phone: a 22ch term column leaves a definition unreadable. */
+@media (max-width: 640px) {
+  .gterm,
+  .glossary-tight .gterm {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s1);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   The recovery flow. Six stages that read as a row on a desktop and a column
+   on a phone. The connector is a border on the stage rather than a separate
+   element, so nothing has to be hidden from a screen reader.
+   ------------------------------------------------------------------------- */
+
+.flow {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--s2);
+  margin: var(--s4) 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: none;
+}
+
+.flow-stage {
+  position: relative;
+  padding: var(--s3) var(--s3) var(--s3) var(--s5);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--idle);
+}
+
+.flow-n {
+  position: absolute;
+  top: var(--s3);
+  left: var(--s3);
+  font-size: var(--t-xs);
+  color: var(--muted);
+}
+
+.flow-stage h3 {
+  margin: 0 0 var(--s1);
+  font-family: var(--sans);
+  font-size: var(--t-md);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.flow-stage p {
+  margin: 0 0 var(--s2);
+  max-width: 60ch;
+  font-family: var(--sans);
+  font-size: var(--t-sm);
+  color: var(--muted);
+}
+
+.flow-type {
+  font-family: var(--mono);
+  font-size: var(--t-xs);
+  letter-spacing: 0.02em;
+  color: var(--accent);
+  word-break: break-word;
+}
+
+.flow-break {
+  border-left-color: var(--bad);
+}
+
+.flow-recovery {
+  border-left-color: var(--accent);
+}
+
+.flow-ok {
+  border-left-color: var(--ok);
+}
+
+/* Three across, two rows: six stages in one row would leave a 12ch column for
+   a sentence. */
+@media (min-width: 900px) {
+  .flow {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Audience. Two columns of "this is for you" / "this is not that".
+   ------------------------------------------------------------------------- */
+
+.audience {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--s4);
+  margin: var(--s3) 0 0;
+}
+
+.audience h3 {
+  margin: 0 0 var(--s2);
+  font-family: var(--sans);
+  font-size: var(--t-md);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.audience ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.audience li {
+  padding: var(--s2) 0;
+  border-bottom: 1px solid var(--rule);
+  font-family: var(--sans);
+  font-size: var(--t-md);
+  color: var(--muted);
+  max-width: 60ch;
+}
+
+.audience li:last-child {
+  border-bottom: 0;
+}
+
+.audience li b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+@media (min-width: 900px) {
+  .audience {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--s6);
+  }
+}
+
+/* A caveat inside a definition: it qualifies the sentence before it, so it is
+   part of the definition rather than a separate note under the list. */
+.gnote {
+  color: var(--warn);
+}

@@ -366,9 +366,12 @@ return nil, sdk.Permanent(fmt.Errorf("malformed row %d: %w", i, err))
 
 ## Fault injection
 
-Five fault types, each a **real degradation** rather than a flag the scheduler
-consults — a fault the scheduler knows about is one it can be written to survive
-without the recovery path ever running.
+Five fault types, none of them a flag the scheduler consults — a fault the
+scheduler knows about is one it can be written to survive without the recovery
+path ever running. `worker-crash` and `latency` degrade the real system:
+a real `SIGKILL`, and a real delay that pushes the task towards its lease.
+`http-error`, `db-disconnect` and `duplicate-delivery` produce the failure the
+dependency would have produced, at the point the task would have seen it.
 
 | Type | What it does |
 |---|---|
@@ -376,7 +379,7 @@ without the recovery path ever running.
 | `duplicate-delivery` | Invokes the handler again after the task completed, as a re-delivered message would |
 | `latency` | Really sleeps, pushing the task towards its lease and timeout |
 | `http-error` | Fails the task as an outbound call would |
-| `db-disconnect` | Fails the task as a dropped connection would |
+| `db-disconnect` | Fails the task as a dropped connection would. It reports the failure rather than closing the worker's shared pool, which would take out every other task on that worker and make the scenario test several things at once |
 
 A sixth, `queue-overload`, is named in the code and **not implemented**. Queue
 contention is a property of the whole pool rather than of one task, so it does
