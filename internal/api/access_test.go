@@ -137,7 +137,7 @@ func TestIntParamCapsTheValue(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := httptest.NewRequest("GET", "/?"+tt.query, nil)
-			if got := server.intParam(r, "limit", tt.fallback); got != tt.want {
+			if got := server.pageLimit(r, tt.fallback); got != tt.want {
 				t.Fatalf("limit parsing returned %d, want %d: the server-side row cap must not be bypassable", got, tt.want)
 			}
 		})

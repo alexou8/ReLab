@@ -35,6 +35,16 @@ const API_BASE = process.env.RELAB_API_URL?.replace(/\/+$/, "") ?? "";
  */
 const API_TOKEN = process.env.RELAB_API_TOKEN ?? "";
 
+/** How many events to ask for per request when walking a run's journal. */
+const EVENT_PAGE = 500;
+
+/**
+ * A ceiling on how much of a journal one page will assemble. A run this long is
+ * not something to render in a browser, and looping until memory ran out would
+ * be a worse failure than refusing.
+ */
+const MAX_EVENTS = 20_000;
+
 /** How long a page will wait for the API before rendering an error state. */
 const REQUEST_TIMEOUT_MS = 5_000;
 
@@ -276,9 +286,42 @@ export async function fetchTasks(id: string): Promise<Task[]> {
 
 export async function fetchEvents(id: string): Promise<RunEvent[]> {
   if (mode() === "demo") return demoRun(id).events;
-  const path = `/api/v1/runs/${id}/events`;
-  const body = expectObject<{ events?: unknown }>(await get(path), path);
-  return expectArray<RunEvent>(body.events, path);
+  // The API pages the journal, and every page in this dashboard reasons about a
+  // whole run: the verdict counts suppressed effects and abandoned tasks, and a
+  // partial journal would produce a confident wrong answer rather than an
+  // obviously missing one. So follow has_more to the end.
+  const events: RunEvent[] = [];
+  let after = 0;
+  for (;;) {
+    const path = `/api/v1/runs/${id}/events?limit=${EVENT_PAGE}&after_seq=${after}`;
+    const body = expectObject<{ events?: unknown; has_more?: unknown }>(
+      await get(path),
+      path,
+    );
+    const page = expectArray<RunEvent>(body.events, path);
+    events.push(...page);
+    if (body.has_more !== true || page.length === 0) {
+      return events;
+    }
+    const last = page[page.length - 1]?.Seq ?? after;
+    if (last <= after) {
+      // The cursor did not advance, so following it again would loop forever.
+      // Answering with what arrived would be worse than saying so.
+      throw new ApiError(
+        "the API returned a page that does not advance the journal cursor",
+        path,
+        false,
+        true,
+      );
+    }
+    after = last;
+    if (events.length > MAX_EVENTS) {
+      throw new ApiError(
+        `this run has more than ${MAX_EVENTS} events, which this dashboard will not load in one page`,
+        path,
+      );
+    }
+  }
 }
 
 export async function fetchWorkers(): Promise<Worker[]> {

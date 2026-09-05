@@ -159,11 +159,19 @@ paths:
     get:
       tags: [runs]
       summary: The run's tasks
+      description: |
+        One page of the run's tasks, ascending by task name. Page with
+        `after_task`, set to the name of the last task you received.
       parameters:
         - $ref: "#/components/parameters/RunID"
+        - name: after_task
+          in: query
+          description: Return tasks whose name sorts after this one.
+          schema: { type: string }
+        - $ref: "#/components/parameters/PageLimit"
       responses:
         "200":
-          description: The tasks, one row per step of the workflow.
+          description: One page of tasks, ascending by name.
           content:
             application/json:
               schema:
@@ -172,6 +180,9 @@ paths:
                   tasks:
                     type: array
                     items: { $ref: "#/components/schemas/Task" }
+                  has_more:
+                    type: boolean
+                    description: More tasks follow this page.
         "400": { $ref: "#/components/responses/BadRunID" }
         "404": { $ref: "#/components/responses/NotFound" }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -182,15 +193,26 @@ paths:
       tags: [runs]
       summary: The run's journal
       description: |
-        The append-only event history, in sequence order. Sequence numbers are
-        gapless: a gap means data was lost, not that something was skipped. A
-        finished run's terminal event is its last, so this response cannot grow
-        once the run has completed.
+        One page of the append-only event history, ascending by `Seq`. Sequence
+        numbers are gapless: a gap means data was lost, not that something was
+        skipped. A finished run's terminal event is its last, so a completed
+        run's history cannot grow.
+
+        Page with `after_seq`, set to the `Seq` of the last event you received,
+        until `has_more` is false. **A partial journal is not a journal**: any
+        answer computed from one — whether a run recovered, whether an effect
+        was repeated — can be confidently wrong. Read to the end before
+        reasoning about a run.
       parameters:
         - $ref: "#/components/parameters/RunID"
+        - name: after_seq
+          in: query
+          description: Return events with a sequence number greater than this.
+          schema: { type: integer, format: int64, minimum: 0 }
+        - $ref: "#/components/parameters/PageLimit"
       responses:
         "200":
-          description: Every event of the run, ascending by Seq.
+          description: One page of the run's events, ascending by Seq.
           content:
             application/json:
               schema:
@@ -199,6 +221,9 @@ paths:
                   events:
                     type: array
                     items: { $ref: "#/components/schemas/Event" }
+                  has_more:
+                    type: boolean
+                    description: More events follow this page.
         "400": { $ref: "#/components/responses/BadRunID" }
         "404": { $ref: "#/components/responses/NotFound" }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -245,6 +270,14 @@ components:
         Missing, malformed and unknown tokens are answered identically, so a
         caller cannot learn which tokens exist.
   parameters:
+    PageLimit:
+      name: limit
+      in: query
+      description: >-
+        Page size. Clamped to the deployment's RELAB_API_MAX_LIMIT (500 by
+        default) rather than rejected, so a caller asking for everything gets a
+        page instead of an error.
+      schema: { type: integer, minimum: 1 }
     RunID:
       name: runID
       in: path

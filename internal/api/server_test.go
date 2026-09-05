@@ -1,6 +1,7 @@
 package api_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +14,8 @@ import (
 	"github.com/alexou8/relab/internal/engine"
 	"github.com/alexou8/relab/internal/store"
 	"github.com/alexou8/relab/internal/testsupport"
+	"github.com/alexou8/relab/internal/workflow"
+	"github.com/alexou8/relab/sdk"
 )
 
 func newServer(t *testing.T) http.Handler {
@@ -157,6 +160,49 @@ func TestTheRunLimitIsCappedAndNonsenseFallsBack(t *testing.T) {
 		if rec.Code != http.StatusOK {
 			t.Errorf("/api/v1/runs?%s returned %d, want 200: a nonsense limit is not "+
 				"an error, it is a limit that does not apply", query, rec.Code)
+		}
+	}
+}
+
+func TestRunEventsPageUsesConfiguredCapAndReportsMore(t *testing.T) {
+	db := testsupport.DB(t)
+	reg := sdk.NewRegistry()
+	reg.MustHandle("ok", func(context.Context, *sdk.TaskContext) (any, error) { return nil, nil })
+	def, err := workflow.Parse([]byte("name: paged\nversion: 1\nsteps:\n  - {name: first, handler: ok}\n"), reg.Set())
+	if err != nil {
+		t.Fatalf("parse workflow: %v", err)
+	}
+	eng, err := engine.New(db, engine.Options{})
+	if err != nil {
+		t.Fatalf("new engine: %v", err)
+	}
+	wf, err := eng.RegisterWorkflow(context.Background(), def)
+	if err != nil {
+		t.Fatalf("register workflow: %v", err)
+	}
+	run, err := eng.CreateRun(context.Background(), wf, def, engine.CreateRunOptions{})
+	if err != nil {
+		t.Fatalf("create run: %v", err)
+	}
+	cfg := config.DefaultAPIConfig()
+	cfg.MaxLimit = 1
+	h := api.NewServer(eng, nil, "test", cfg).Routes()
+	for _, suffix := range []string{"", "?limit=100"} {
+		rec := do(t, h, "/api/v1/runs/"+run.ID.String()+"/events"+suffix)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("paged events %q returned %d: %s", suffix, rec.Code, rec.Body.String())
+		}
+		var body struct {
+			Events []struct {
+				Seq int64 `json:"seq"`
+			} `json:"events"`
+			HasMore bool `json:"has_more"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+			t.Fatalf("decode paged events %q: %v", suffix, err)
+		}
+		if len(body.Events) != 1 || body.Events[0].Seq != 1 || !body.HasMore {
+			t.Fatalf("paged response %q returned events=%v and has_more=%t: the default and configured cap must return the bounded first page", suffix, body.Events, body.HasMore)
 		}
 	}
 }

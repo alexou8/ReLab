@@ -147,7 +147,7 @@ func (s *Server) notReady(w http.ResponseWriter, r *http.Request, reason string,
 }
 
 func (s *Server) listWorkflows(w http.ResponseWriter, r *http.Request) {
-	workflows, err := s.engine.ListWorkflows(r.Context(), s.intParam(r, "limit", 100))
+	workflows, err := s.engine.ListWorkflows(r.Context(), s.pageLimit(r, 100))
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -159,7 +159,7 @@ func (s *Server) listRuns(w http.ResponseWriter, r *http.Request) {
 	runs, err := s.engine.ListRuns(r.Context(), engine.ListRunsOptions{
 		Status:   engine.RunStatus(r.URL.Query().Get("status")),
 		Workflow: r.URL.Query().Get("workflow"),
-		Limit:    s.intParam(r, "limit", 50),
+		Limit:    s.pageLimit(r, 50),
 	})
 	if err != nil {
 		s.fail(w, r, err)
@@ -186,12 +186,13 @@ func (s *Server) getRunTasks(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	tasks, err := s.engine.Tasks(r.Context(), runID)
+	tasks, hasMore, err := s.engine.TasksPage(r.Context(), runID,
+		r.URL.Query().Get("after_task"), s.pageLimit(r, 100))
 	if err != nil {
 		s.fail(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"tasks": tasks})
+	writeJSON(w, http.StatusOK, map[string]any{"tasks": tasks, "has_more": hasMore})
 }
 
 func (s *Server) getRunEvents(w http.ResponseWriter, r *http.Request) {
@@ -199,12 +200,13 @@ func (s *Server) getRunEvents(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	events, err := s.engine.Events(r.Context(), runID)
+	events, hasMore, err := s.engine.EventsPage(r.Context(), runID,
+		s.int64Param(r, "after_seq", 0), s.pageLimit(r, 100))
 	if err != nil {
 		s.fail(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"events": events})
+	writeJSON(w, http.StatusOK, map[string]any{"events": events, "has_more": hasMore})
 }
 
 func (s *Server) listWorkers(w http.ResponseWriter, r *http.Request) {
@@ -323,8 +325,13 @@ func errorBody(message string) map[string]string {
 	return map[string]string{"error": message}
 }
 
-func (s *Server) intParam(r *http.Request, name string, fallback int) int {
-	raw := r.URL.Query().Get(name)
+// pageLimit reads the page size from the request, clamped to the deployment's
+// cap. A caller asking for more than the cap gets a page rather than an error:
+// the cap exists to bound this deployment's work, and refusing the request
+// would make a client's reasonable "give me everything" into a failure instead
+// of a first page.
+func (s *Server) pageLimit(r *http.Request, fallback int) int {
+	raw := r.URL.Query().Get("limit")
 	v := fallback
 	if raw != "" {
 		parsed, err := strconv.Atoi(raw)
@@ -334,6 +341,18 @@ func (s *Server) intParam(r *http.Request, name string, fallback int) int {
 	}
 	if v > s.config.MaxLimit {
 		return s.config.MaxLimit
+	}
+	return v
+}
+
+func (s *Server) int64Param(r *http.Request, name string, fallback int64) int64 {
+	raw := r.URL.Query().Get(name)
+	if raw == "" {
+		return fallback
+	}
+	v, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || v < 0 {
+		return fallback
 	}
 	return v
 }

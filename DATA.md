@@ -104,6 +104,10 @@ a task in `LEASED` or `RUNNING` must name a worker.
 - `(lease_expires_at) WHERE status IN ('LEASED','RUNNING')` — the reaper's.
 - `(run_id)`.
 
+The unique index on `(run_id, task_name)` also serves the API's bounded task
+listing: `run_id` selects one run and `task_name > after_task` advances the
+keyset in name order. No additional pagination index is needed.
+
 **Lifecycle** (`internal/engine/state.go`; every transition, legal and illegal,
 is unit tested):
 
@@ -156,6 +160,10 @@ The append-only run journal. **No row is ever updated or deleted.**
 | `occurred_at` | timestamptz | no | |
 
 **Primary key:** `(run_id, seq)`.
+
+The primary-key index serves bounded journal reads: `run_id` selects one run,
+`seq > after_seq` advances the keyset, and rows are returned in ascending
+sequence order. No additional pagination index is needed.
 
 **Check:** `jsonb_typeof(payload) = 'object'`.
 

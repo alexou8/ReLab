@@ -27,6 +27,12 @@ each such change is listed here:
   address with no tokens configured refuses to start, naming both ways out.
   `RELAB_INSECURE_NO_AUTH=true` is the deliberate opt-out, and the compose stack
   sets it because it is a development stack.
+- **Bounded queries.** `/api/v1/runs/{id}/events` and `/api/v1/runs/{id}/tasks`
+  are paginated by keyset — `after_seq` and `after_task`, with `has_more` in the
+  body — so no single request can ask a deployment for an entire journal. The
+  existing `events` and `tasks` keys are unchanged; the dashboard follows
+  `has_more` to the end, because a partial journal produces a confident wrong
+  verdict rather than an obviously missing one.
 - **Request limits.** A body-size cap, a cap on the `limit` query parameter, and
   a token-bucket rate limit per token — or per source address where no tokens
   are configured — answering 429 with `Retry-After`.
