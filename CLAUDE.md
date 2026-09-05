@@ -135,7 +135,11 @@ databases on. Without it, the database tests skip rather than fail.
   way.
 - Every query parameterised.
 - API error bodies carry a category, never an internal detail.
-- v1 has no authentication. Do not add a feature that assumes it does.
+- The API takes bearer tokens (`RELAB_API_TOKENS`, roles `viewer` and
+  `operator`) and refuses to serve unauthenticated on a non-loopback address
+  unless `RELAB_INSECURE_NO_AUTH=true` says so out loud. There are no user
+  accounts, no sessions, and no per-token audit trail; do not add a feature that
+  assumes any of those exist.
 - **This repository is public.** No credential, token, or `auth.json` belongs in
   a tracked file, a prompt, an issue, a log, or CI output. Agent tooling signs
   in through the user's private `~/.codex`; see AGENTS.md, "Secret handling".

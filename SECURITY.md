@@ -1,12 +1,9 @@
 # Security
 
 This document describes ReLab's actual security posture, including what it does
-not do. ReLab v1 has **no authentication and no authorisation**. Anyone who can
-reach the API can read every run, and anyone who can reach the database can do
-anything.
-
-That is a scope decision, not an oversight, and this document exists so nobody
-has to discover it by reading the code.
+not do. The read API supports role-bearing bearer tokens and refuses an
+unauthenticated non-loopback bind by default. Anyone who can reach the database
+can still do anything.
 
 ## Reporting a vulnerability
 
@@ -28,18 +25,15 @@ get an acknowledgement, an assessment of whether it is in scope, and — if it i
 document, corrupt or lose journal data, escalate from the dashboard to the
 control plane, or execute code from workflow or scenario input.
 
-**Out of scope, because they are documented above and below rather than
-accidents:** the absence of API authentication and authorisation in v1, an
-unauthenticated control plane being readable by whoever can reach it, and
-anything that requires database access, which is already full control. If you
-think one of those *should* be in scope, that is a roadmap issue and a welcome
-one — file it publicly.
+**Out of scope, because they are documented below rather than accidents:** an
+operator explicitly setting `RELAB_INSECURE_NO_AUTH=true`, and anything that
+requires database access, which is already full control.
 
 ## Threat model
 
-**Intended deployment:** a developer's machine, or a CI runner, on a private
-network. ReLab is a tool you point at your own workflows to find out whether
-they recover.
+**Intended deployment:** a developer's machine, a CI runner, or a self-hosted
+private network. ReLab is a tool you point at your own workflows to find out
+whether they recover.
 
 **Explicitly out of scope for v1:** the public internet, multi-tenancy, any
 deployment where the operator does not trust everyone who can reach the port.
@@ -48,31 +42,43 @@ deployment where the operator does not trust everyone who can reach the port.
 |---|---|---|
 | Operator | Trusted | Full access by design |
 | Workflow author | Trusted | Handlers run as the worker process, unsandboxed |
-| Anyone reaching the API | **Trusted, because nothing stops them** | Full read access |
+| Caller with a viewer token | Trusted to read | Full read access |
+| Caller with an operator token | Trusted to operate ReLab | Currently the same read access; the role is reserved for future write endpoints |
+| Unauthenticated caller | Untrusted | Probe access only; API requests receive the same 401 response |
 | Anyone reaching the database | Trusted | Full read/write |
 | Network between processes | Trusted | Postgres TLS is the DSN's business |
 
 ## Trust boundaries
 
-There is one boundary that ReLab enforces: **the process boundary around a
-worker**. A worker executes handler code and can do anything that code can do.
+ReLab enforces an HTTP authentication boundary and the **process boundary around
+a worker**. A worker executes handler code and can do anything that code can do.
 There is no sandbox, and none is planned — the workflows are the user's own, and
 a sandbox that a workflow author can trivially step outside is worse than an
 honest statement that there is none.
 
-Everything else — API, coordinator, database — is inside one trust zone.
+The coordinator and database remain inside one trusted deployment zone.
 
 ## Authentication
 
-None. There is no login, no API key, no token.
+Set `RELAB_API_TOKENS` to a comma-separated list of `role:token` entries, where
+the role is `viewer` or `operator`. API callers send `Authorization: Bearer
+<token>`. Token digests are compared in constant time. Missing, malformed and
+unknown credentials all receive the same status and body: 401 with
+`{"error":"unauthorized"}`. Tokens are never returned or logged.
 
-**If you expose the API**, put it behind something that authenticates:
-a reverse proxy with mTLS or OIDC, a service mesh, or an SSH tunnel. Do not put
-ReLab on a public address and hope.
+`/healthz` and `/readyz` deliberately remain unauthenticated so container and
+orchestrator probes do not need a credential.
+
+Without tokens, ReLab serves only on an explicit loopback address. A wildcard
+or other non-loopback bind fails startup unless the operator explicitly sets
+`RELAB_INSECURE_NO_AUTH=true`. That switch makes every API caller a viewer; its
+name is intentionally hard to mistake for a safe production setting.
 
 ## Authorisation
 
-None. Every caller can read every run.
+Viewer tokens can use every current endpoint. Operator tokens inherit viewer
+access and are reserved for future state-changing endpoints. There are no such
+endpoints today.
 
 ## Session management
 
@@ -80,7 +86,8 @@ Not applicable — no sessions exist.
 
 ## Credential handling and secret management
 
-The **database connection string is the only secret ReLab has.**
+The database connection string and configured bearer tokens are ReLab's
+secrets.
 
 - It is read from `RELAB_DSN` rather than a flag, so it does not appear in the
   process table.
@@ -91,7 +98,9 @@ The **database connection string is the only secret ReLab has.**
   the password alone, because a truncated DSN inside a driver message would slip
   past a whole-string match. `TestOpenDoesNotLeakPassword` asserts it.
 
-ReLab has no secret store and needs none.
+Bearer tokens are read from `RELAB_API_TOKENS`, are never logged, and are
+omitted from configuration errors. Supply both tokens and the DSN through the
+deployment platform's secret mechanism, not a checked-in environment file.
 
 ## Input validation
 
@@ -100,7 +109,8 @@ ReLab has no secret store and needs none.
 | Workflow YAML | Strict: unknown fields rejected, cycles detected, names restricted to `[A-Za-z0-9_-]` and 64 characters, retry policies checked. Every problem reported at once |
 | Scenario YAML | Same strictness; unknown fault types and trigger points rejected |
 | Run ids in URLs | Parsed as UUIDs before use |
-| Query parameters | `limit` clamped to 500; unparseable values fall back to defaults |
+| Query parameters | `limit` clamped to `RELAB_API_MAX_LIMIT` (500 by default); unparseable values fall back to endpoint defaults |
+| Request bodies | Capped by `RELAB_API_MAX_BODY_BYTES` (1 MiB by default) |
 | Environment durations | A present but unparseable value is an error, never a silent fallback |
 
 Step and workflow names are restricted specifically because they end up in
@@ -141,12 +151,17 @@ author's problem, and one ReLab cannot see.
 
 ## Rate limiting and abuse prevention
 
-None. A caller that can reach the API can hammer it. In the intended deployment
-that caller is the operator.
+The API uses an in-memory token bucket per authenticated token, or per direct
+client IP when authentication is disabled or fails. The default is 10 requests
+per second with a burst of 20; `RELAB_API_RATE_LIMIT` and
+`RELAB_API_RATE_BURST` change it. Exhaustion returns 429 with the category
+`rate limited`. Proxy forwarding headers are not trusted.
 
-The API does bound resource use per request: a 30-second handler timeout, a
-`limit` clamped to 500, and `ReadHeaderTimeout` on the HTTP server (which is
-what closes the slowloris hole).
+The limiter is local to a process, so deployments with several control planes
+multiply the effective allowance. It does not replace an edge limiter for a
+service exposed to an untrusted network. Per-request defenses additionally
+include a 30-second handler timeout, the body and row caps, and
+`ReadHeaderTimeout` on the HTTP server.
 
 ## File upload
 
@@ -159,6 +174,8 @@ stores file bytes.
   hold a connection and a goroutine indefinitely.
 - `Recoverer` middleware, so a panic in one handler does not take the server
   down.
+- Bearer authentication on `/api/v1`; probes stay unauthenticated.
+- Per-client rate limiting and request body and query-result caps.
 - **Error bodies carry a category, never an internal detail.** A database error
   can contain a table name, a constraint, or a fragment of a query, none of
   which helps a legitimate caller. The full error is logged with the request id.
@@ -257,10 +274,9 @@ ReLab's state is a CLI verb that needs a DSN.
 
 `RELAB_API_URL` is read on the server and is never prefixed `NEXT_PUBLIC_`, so
 it is not inlined into the client bundle. The browser never learns the API's
-address and never issues a request to it. There is no other configuration and no
-secret in the deployment, because the API has no credential to hold — which is
-also the reason a live control plane behind that variable must not be publicly
-reachable. See `docs/deployment.md` §7.
+address and never issues a request to it. A live dashboard integration must hold
+a viewer token on its server side and send it as a bearer credential. The
+browser must never receive that token. See `docs/deployment.md` §7.
 
 The recording is an export of runs from a scratch database created by
 `scripts/record-demo.sh`. It contains workflow definitions, event payloads and
@@ -296,6 +312,8 @@ is no second store.
 - Every query parameterised, enforced by review and by there being no
   string-building helper to misuse.
 - `TestOpenDoesNotLeakPassword` asserts the redaction.
+- API tests assert indistinguishable authentication failures, unauthenticated
+  probes, request caps and rate limiting.
 - `golangci-lint` runs `gosec`-adjacent checks (`bodyclose`, `noctx`,
   `sqlclosecheck`, `rowserrcheck`) on every push.
 - The process-level suite kills real binaries, which is a robustness test rather
@@ -309,28 +327,33 @@ testing.
 
 Stated plainly, in the order they would matter:
 
-1. **No authentication.** An exposed API is fully readable. Mitigation: do not
-   expose it; put a proxy in front if you must.
-2. **Handlers are unsandboxed.** A workflow author has the worker's full
+1. **Bearer tokens are long-lived shared secrets.** There is no expiry,
+   revocation endpoint, individual identity, or audit attribution. Mitigation:
+   rotate the environment value and restart control planes; use an
+   authenticating proxy when individual identities matter.
+2. **The rate limiter is per process and in memory.** Restarts refill it and
+   replicas multiply it. Mitigation: enforce a deployment-wide limit at the
+   ingress when the network is untrusted.
+3. **Handlers are unsandboxed.** A workflow author has the worker's full
    privileges. Mitigation: only run workflows you trust, and run workers with
    least privilege.
-3. **Handler output is stored verbatim.** A handler returning a secret persists
+4. **Handler output is stored verbatim.** A handler returning a secret persists
    it. Mitigation: do not return secrets.
-4. **No retention policy.** The journal grows without bound, so a long-running
+5. **No retention policy.** The journal grows without bound, so a long-running
    deployment accumulates whatever handlers put in it. Mitigation: delete old
    runs.
-5. **No dependency scanning in CI.** A vulnerable dependency would not be caught
+6. **No dependency scanning in CI.** A vulnerable dependency would not be caught
    automatically. Mitigation: run `govulncheck` and `npm audit` before
    releasing.
-6. **The dashboard carries a build-time `postcss` advisory** that cannot be
+7. **The dashboard carries a build-time `postcss` advisory** that cannot be
    resolved without moving `next` outside its supported range. It is reachable
    only by a source map in CSS this repository writes itself, not by anything a
    visitor sends. Mitigation: it clears when Next ships a release that bumps it.
-7. **The recording is whatever the export contained.** It is checked into the
+8. **The recording is whatever the export contained.** It is checked into the
    repository and served publicly, so anything in the database it was made from
    is public. Mitigation: record against a scratch database, which is what
    `scripts/record-demo.sh` documents.
-6. **OTLP is insecure by default.** Traces could be read on a hostile network.
+9. **OTLP is insecure by default.** Traces could be read on a hostile network.
    Mitigation: keep the collector local.
 
 None of these is a bug. All of them are consequences of v1's scope, and every

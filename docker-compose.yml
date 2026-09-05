@@ -19,6 +19,13 @@ x-relab-env: &relab-env
   RELAB_LEASE_RENEW_INTERVAL: 2s
   RELAB_HEARTBEAT_INTERVAL: 1s
   RELAB_REAPER_INTERVAL: 500ms
+  # This stack binds the API on :8080, which is not loopback, and configures no
+  # tokens — so it has to say out loud that it is a development stack. Without
+  # this the server refuses to start, which is the behaviour a real deployment
+  # wants: an unauthenticated ReLab should never become reachable by accident.
+  # Do not copy this line into anything that is not your own machine; set
+  # RELAB_API_TOKENS instead. See SECURITY.md.
+  RELAB_INSECURE_NO_AUTH: "true"
 
 services:
   postgres:

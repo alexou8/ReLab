@@ -60,6 +60,7 @@ func Execute(version string) error {
 		newWorkersCmd(g),
 		newReplayCmd(g),
 		newTestCmd(g),
+		newDemoCmd(g),
 		newBenchCmd(g, version),
 		newExportCmd(g, version),
 	)

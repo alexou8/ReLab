@@ -129,10 +129,10 @@ change to the dashboard can be reviewed by looking at it.
 | `RELAB_API_URL` | Production, Preview | *(unset)* | The dashboard serves the bundled recording and labels every page as such |
 | `RELAB_API_URL` | Production | `https://relab-api.example` | Every page reads that control plane, server-side |
 
-There are no other variables, and there is no secret. That is not an oversight
-to be corrected later: the ReLab API has no authentication in v1, so there is no
-credential to hold. It also means **`RELAB_API_URL` must not point at a control
-plane whose only protection is that nobody has guessed its address.** §7.
+The recording deployment has no secret because it has no backend. A live
+dashboard integration must also configure a viewer token in server-only
+environment and attach it as a bearer credential; never expose that value with
+a `NEXT_PUBLIC_` name. §7 describes the required companion change.
 
 `RELAB_API_URL` is read in `web/src/lib/api.ts` on the server. It is never
 prefixed `NEXT_PUBLIC_`, so it is not inlined into the client bundle and the
@@ -181,7 +181,7 @@ which is the whole reason there is one binary:
 
 ```bash
 docker build -t relab .
-docker run -e RELAB_DSN=... relab server --addr :8080
+docker run -e RELAB_DSN -e RELAB_API_TOKENS relab server --addr :8080
 docker run -e RELAB_DSN=... relab worker --concurrency 4
 ```
 
@@ -207,8 +207,8 @@ Use `/healthz` for liveness and `/readyz` for readiness, and do not swap them: a
 schema mismatch is not fixed by restarting, so a liveness probe reading
 `/readyz` would restart-loop a process forever over a bad deploy.
 
-Neither endpoint returns a version number, a table name or a DSN. `/readyz`
-says which of the two conditions failed; the numbers go to the log.
+Probe error bodies contain only the `unavailable` category, never a version
+number, table name or DSN. The condition and any schema versions go to the log.
 
 ---
 
@@ -220,6 +220,12 @@ Every setting is an environment variable. There is no config file.
 |---|---|---|
 | `RELAB_DSN` | — | Required. Redacted from every error and log line |
 | `RELAB_LISTEN_ADDR` | `:8080` | Control plane only |
+| `RELAB_API_TOKENS` | *(unset)* | Comma-separated `viewer:token` or `operator:token` entries. Required for a non-loopback bind unless the explicit insecure opt-out is set |
+| `RELAB_INSECURE_NO_AUTH` | `false` | Allows an unauthenticated non-loopback bind. Never use on an untrusted network |
+| `RELAB_API_MAX_BODY_BYTES` | `1048576` | Maximum request body size (1 MiB) |
+| `RELAB_API_MAX_LIMIT` | `500` | Maximum `limit` query value |
+| `RELAB_API_RATE_LIMIT` | `10` | Sustained requests per second per token, or direct client IP without a valid token |
+| `RELAB_API_RATE_BURST` | `20` | Immediate burst per rate-limit identity |
 | `RELAB_LOG_LEVEL` | `info` | |
 | `RELAB_LOG_FORMAT` | `text` | Use `json` in a deployment |
 | `RELAB_DB_MAX_CONNS` | see `store.DefaultConfig` | Per process. Multiply by process count before comparing with the server's limit |
@@ -238,6 +244,12 @@ running. The defaults above leave room for both.
 
 `docs/reliability.md` gives the recovery latency each choice buys and the
 constraints `config.Timing.Validate` enforces.
+
+The listener fails closed: no tokens plus `:8080`, `0.0.0.0:8080`, `[::]:8080`
+or any other non-loopback host is a startup error. An explicit loopback such as
+`127.0.0.1:8080`, `[::1]:8080` or `localhost:8080` remains available without
+authentication. Use `RELAB_INSECURE_NO_AUTH=true` only when a trusted network or
+an authenticating proxy supplies the boundary instead.
 
 ### Shutdown
 
@@ -274,11 +286,15 @@ A visitor therefore cannot start a run, kill a worker, inject a fault, register
 a workflow or reach the database. Everything that can change ReLab's state is a
 CLI verb requiring a DSN.
 
-If you do point the public dashboard at a live control plane, understand what
-you are exposing: **the ReLab API has no authentication.** Anyone who can reach
-it can read every run, every event payload and every workflow definition in that
-database. Reachability is the whole access control. Put the control plane on a
-private network, or accept that its contents are public.
+If you point the public dashboard at a live control plane, give its server-side
+fetches a viewer token. The browser must never receive the token or call the
+control plane directly. Missing and unknown tokens both receive the same 401
+category. `/healthz` and `/readyz` remain unauthenticated for probes.
+
+Bearer authentication protects reads but is not TLS. Terminate HTTPS before the
+control plane whenever traffic crosses a host or network you do not fully trust.
+The in-memory rate limiter is per control-plane process, so use an ingress-wide
+limit if replicas must share one allowance.
 
 `SECURITY.md` has the threat model and the residual risks.
 
@@ -331,8 +347,11 @@ one.
 
 - **The dashboard on Vercel shows a recording.** It is real and it is labelled,
   but it is not live, and <https://relabca.vercel.app> has no backend behind it.
-- **The API has no authentication.** v1 non-goal. It bounds where a control
-  plane can be exposed.
+- **API tokens are shared secrets.** They have roles but no expiry, individual
+  identity, revocation endpoint or audit attribution; rotation means changing
+  the environment and restarting the control planes.
+- **Rate limits are per process.** A restart refills them and replicas multiply
+  the effective allowance.
 - **Workers cannot run on Vercel**, and no amount of configuration changes that.
 - **`/readyz` reports schema equality, not correctness.** A database whose
   schema matches but whose data was hand-edited passes.

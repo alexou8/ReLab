@@ -23,6 +23,18 @@ import { snapshot } from "./demo";
 
 const API_BASE = process.env.RELAB_API_URL?.replace(/\/+$/, "") ?? "";
 
+/**
+ * The bearer token for a control plane that requires one.
+ *
+ * It is read on the server and never serialised into a page: every fetch here
+ * happens during rendering, so the browser neither sees the token nor talks to
+ * the API. A dashboard that shipped a viewer token to the browser would hand it
+ * to anyone who opened developer tools.
+ *
+ * A viewer token is the right one to use. The dashboard reads and never writes.
+ */
+const API_TOKEN = process.env.RELAB_API_TOKEN ?? "";
+
 /** How long a page will wait for the API before rendering an error state. */
 const REQUEST_TIMEOUT_MS = 5_000;
 
@@ -138,9 +150,23 @@ async function get<T>(path: string): Promise<T> {
       // The dashboard shows live state, so a cached page would be actively
       // misleading during the thing it exists to observe: a recovery.
       cache: "no-store",
-      headers: { Accept: "application/json" },
+      headers: {
+        Accept: "application/json",
+        ...(API_TOKEN ? { Authorization: `Bearer ${API_TOKEN}` } : {}),
+      },
     });
     if (!response.ok) {
+      // 401 is worth its own sentence: it is the one failure whose fix is a
+      // configuration change here rather than something wrong with the control
+      // plane, and "the API returned 401" sends the reader to the wrong place.
+      if (response.status === 401) {
+        throw new ApiError(
+          API_TOKEN
+            ? "the control plane rejected this dashboard's token"
+            : "the control plane requires a token and RELAB_API_TOKEN is not set",
+          path,
+        );
+      }
       throw new ApiError(
         `the API returned ${response.status}`,
         path,

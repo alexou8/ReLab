@@ -232,8 +232,10 @@ engine mid-run and builds a new one against the same database.
   handler logic.
 - **Not exactly-once.** See above.
 - **Not multi-region.** One PostgreSQL database is the whole system.
-- **Not authenticated.** v1 has no authentication or authorisation. See
-  `SECURITY.md`.
+- **Authenticated only by shared bearer tokens.** Two roles, no accounts, no
+  sessions, no expiry, and no per-token audit identity. A loopback deployment
+  may run with no tokens at all; a non-loopback one has to configure them or
+  declare itself insecure. See `SECURITY.md`.
 - **`queue-overload` is not implemented.** It is named in the code and rejected
   at scenario-parse time, so no scenario can silently run without it.
 - **Not a general-purpose task queue.** Throughput is bounded by one Postgres

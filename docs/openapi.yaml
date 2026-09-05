@@ -8,9 +8,20 @@ info:
     the engine, which the CLI and the workers use directly, so there is one
     implementation of a state change and not two.
 
-    **There is no authentication and no authorisation in v1.** Anyone who can
-    reach this API can read every run. That is a scope decision, documented in
-    SECURITY.md; do not expose an instance to a network you do not control.
+    **Authentication is a shared bearer token.** Configure tokens with
+    `RELAB_API_TOKENS` (`viewer:<token>` or `operator:<token>`); every
+    `/api/v1` endpoint then requires one, and `/healthz` and `/readyz` do not,
+    because probes need them. A server asked to bind a non-loopback address
+    without tokens refuses to start unless `RELAB_INSECURE_NO_AUTH=true` is set
+    deliberately, so an unauthenticated ReLab cannot become reachable by
+    accident. There are no accounts, no sessions, no expiry and no per-token
+    audit identity: a token is a shared password for the whole read API. The
+    `operator` role exists for future state-changing endpoints and today grants
+    exactly what `viewer` does.
+
+    Requests are rate limited per token, or per source address when no token is
+    configured, and bodies and the `limit` parameter are capped. SECURITY.md
+    has the threat model.
 
     Field names are Go field names, because the engine's structs are serialised
     as they are — `ID`, `WorkflowName`, `CreatedAt`. `internal/api/openapi_test.go`
@@ -19,6 +30,8 @@ info:
   license:
     name: Apache-2.0
     url: https://www.apache.org/licenses/LICENSE-2.0
+security:
+  - bearerAuth: []
 servers:
   - url: http://localhost:8080
     description: A local control plane started with `relab server`
@@ -31,6 +44,7 @@ paths:
     get:
       tags: [health]
       summary: Liveness
+      security: []
       description: Answers as soon as the HTTP server is listening. It says nothing about the database.
       responses:
         "200":
@@ -46,6 +60,7 @@ paths:
     get:
       tags: [health]
       summary: Readiness
+      security: []
       description: |
         Reports whether the process can actually serve: the database is
         reachable, and its schema matches the version this binary was built for.
@@ -91,6 +106,8 @@ paths:
                   workflows:
                     type: array
                     items: { $ref: "#/components/schemas/Workflow" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/RateLimited" }
         "500": { $ref: "#/components/responses/InternalError" }
   /api/v1/runs:
     get:
@@ -118,6 +135,8 @@ paths:
                   runs:
                     type: array
                     items: { $ref: "#/components/schemas/Run" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/RateLimited" }
         "500": { $ref: "#/components/responses/InternalError" }
   /api/v1/runs/{runID}:
     get:
@@ -133,6 +152,8 @@ paths:
               schema: { $ref: "#/components/schemas/Run" }
         "400": { $ref: "#/components/responses/BadRunID" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/RateLimited" }
         "500": { $ref: "#/components/responses/InternalError" }
   /api/v1/runs/{runID}/tasks:
     get:
@@ -153,6 +174,8 @@ paths:
                     items: { $ref: "#/components/schemas/Task" }
         "400": { $ref: "#/components/responses/BadRunID" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/RateLimited" }
         "500": { $ref: "#/components/responses/InternalError" }
   /api/v1/runs/{runID}/events:
     get:
@@ -178,6 +201,8 @@ paths:
                     items: { $ref: "#/components/schemas/Event" }
         "400": { $ref: "#/components/responses/BadRunID" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/RateLimited" }
         "500": { $ref: "#/components/responses/InternalError" }
   /api/v1/workers:
     get:
@@ -194,6 +219,8 @@ paths:
                   workers:
                     type: array
                     items: { $ref: "#/components/schemas/Worker" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/RateLimited" }
         "500": { $ref: "#/components/responses/InternalError" }
   /api/v1/stats:
     get:
@@ -205,8 +232,18 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Stats" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/RateLimited" }
         "500": { $ref: "#/components/responses/InternalError" }
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: >-
+        A token from RELAB_API_TOKENS. Sent as `Authorization: Bearer <token>`.
+        Missing, malformed and unknown tokens are answered identically, so a
+        caller cannot learn which tokens exist.
   parameters:
     RunID:
       name: runID
@@ -221,6 +258,20 @@ components:
           schema: { $ref: "#/components/schemas/Error" }
     NotFound:
       description: No run with that id.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unauthorized:
+      description: |
+        No token, a malformed Authorization header, or a token that is not
+        configured. All three are answered identically.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    RateLimited:
+      description: |
+        Too many requests for this token, or for this source address when the
+        deployment configures no tokens. Carries `Retry-After`.
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }

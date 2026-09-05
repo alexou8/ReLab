@@ -9,19 +9,24 @@ import (
 	"testing"
 
 	"github.com/alexou8/relab/internal/api"
+	"github.com/alexou8/relab/internal/config"
 	"github.com/alexou8/relab/internal/engine"
 	"github.com/alexou8/relab/internal/store"
 	"github.com/alexou8/relab/internal/testsupport"
 )
 
 func newServer(t *testing.T) http.Handler {
+	return newServerWithConfig(t, config.DefaultAPIConfig())
+}
+
+func newServerWithConfig(t *testing.T, cfg config.APIConfig) http.Handler {
 	t.Helper()
 	db := testsupport.DB(t)
 	eng, err := engine.New(db, engine.Options{})
 	if err != nil {
 		t.Fatalf("new engine: %v", err)
 	}
-	return api.NewServer(eng, nil, "test").Routes()
+	return api.NewServer(eng, nil, "test", cfg).Routes()
 }
 
 // do issues a request and returns the recorded response.
@@ -30,6 +35,59 @@ func do(t *testing.T, h http.Handler, path string) *httptest.ResponseRecorder {
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
 	return rec
+}
+
+func TestProbesStayUnauthenticated(t *testing.T) {
+	cfg := config.DefaultAPIConfig()
+	cfg.Tokens = []config.APIToken{{Value: "configured-secret", Role: config.RoleViewer}}
+	h := newServerWithConfig(t, cfg)
+
+	for _, path := range []string{"/healthz", "/readyz"} {
+		t.Run(path, func(t *testing.T) {
+			rec := do(t, h, path)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("probe %s required a bearer token: status %d body %s", path, rec.Code, rec.Body.String())
+			}
+		})
+	}
+}
+
+func TestRouteErrorsCarryOnlyACategory(t *testing.T) {
+	h := api.NewServer(nil, nil, "test", config.DefaultAPIConfig()).Routes()
+	tests := []struct {
+		name   string
+		method string
+		path   string
+		status int
+		want   string
+	}{
+		// The message names the shape of the path, which is a fact about the
+		// API, and never echoes the id or anything about the parse failure.
+		{name: "malformed run id", method: http.MethodGet, path: "/api/v1/runs/not-a-uuid", status: http.StatusBadRequest, want: "run id must be a UUID"},
+		{name: "unknown route", method: http.MethodGet, path: "/missing", status: http.StatusNotFound, want: "not found"},
+		{name: "wrong method", method: http.MethodPost, path: "/healthz", status: http.StatusMethodNotAllowed, want: "method not allowed"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, httptest.NewRequest(tt.method, tt.path, nil))
+			if rec.Code != tt.status {
+				t.Fatalf("route error returned %d, want %d: errors must retain their HTTP category", rec.Code, tt.status)
+			}
+			var body map[string]string
+			if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+				t.Fatalf("route error is not a JSON category: %v", err)
+			}
+			if len(body) != 1 || body["error"] != tt.want {
+				t.Fatalf("route error body is %#v, want only error=%q to avoid exposing internals", body, tt.want)
+			}
+			// Whatever the wording, the caller's own input must not come back:
+			// an echoed path is the cheapest reflection bug there is.
+			if strings.Contains(body["error"], "not-a-uuid") || strings.Contains(body["error"], "missing") {
+				t.Fatalf("route error %q echoes the request", body["error"])
+			}
+		})
+	}
 }
 
 // The API is read-only, and that is a property a public deployment depends on
@@ -112,7 +170,7 @@ func TestReadinessFailsWhenTheSchemaDoesNotMatchTheBuild(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new engine: %v", err)
 	}
-	h := api.NewServer(eng, nil, "test").Routes()
+	h := api.NewServer(eng, nil, "test", config.DefaultAPIConfig()).Routes()
 
 	rec := do(t, h, "/readyz")
 	if rec.Code != http.StatusOK {

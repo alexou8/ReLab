@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"runtime/debug"
 	"strconv"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
 
+	"github.com/alexou8/relab/internal/config"
 	"github.com/alexou8/relab/internal/engine"
 	"github.com/alexou8/relab/internal/store"
 )
@@ -23,14 +25,34 @@ type Server struct {
 	engine  *engine.Engine
 	log     *slog.Logger
 	version string
+	config  config.APIConfig
+	access  *accessControl
 }
 
 // NewServer returns a Server.
-func NewServer(e *engine.Engine, log *slog.Logger, version string) *Server {
+//
+// The API configuration is a required argument rather than an option with a
+// default, because the default is "no authentication": a caller who forgot to
+// pass one would get an unauthenticated server and no indication that they had
+// chosen anything. config.DefaultAPIConfig() is the explicit way to ask for it,
+// and config.APIConfig.ValidateBind refuses that choice on a non-loopback
+// address. The command that opens the listener validates the bind address
+// before it serves.
+func NewServer(e *engine.Engine, log *slog.Logger, version string, cfg config.APIConfig) *Server {
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Server{engine: e, log: log, version: version}
+	access := newAccessControl(cfg)
+	// Authentication keeps only fixed-size digests. Request handling needs the
+	// limits, not another long-lived copy of every bearer token.
+	cfg.Tokens = nil
+	return &Server{
+		engine:  e,
+		log:     log,
+		version: version,
+		config:  cfg,
+		access:  access,
+	}
 }
 
 // Routes returns the router.
@@ -40,16 +62,24 @@ func NewServer(e *engine.Engine, log *slog.Logger, version string) *Server {
 func (s *Server) Routes() http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
-	r.Use(middleware.Recoverer)
+	r.Use(s.recoverPanics)
 	r.Use(s.logRequests)
+	r.Use(s.limitRequestBody)
 	// A request that outlives this deadline is holding a database connection
 	// the workers need more than the caller does.
 	r.Use(middleware.Timeout(30 * time.Second))
+	r.NotFound(func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusNotFound, errorBody("not found"))
+	})
+	r.MethodNotAllowed(func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusMethodNotAllowed, errorBody("method not allowed"))
+	})
 
 	r.Get("/healthz", s.health)
 	r.Get("/readyz", s.ready)
 
 	r.Route("/api/v1", func(r chi.Router) {
+		r.Use(s.authorizeAndRateLimit)
 		r.Get("/workflows", s.listWorkflows)
 		r.Get("/runs", s.listRuns)
 		r.Get("/runs/{runID}", s.getRun)
@@ -70,10 +100,10 @@ func (s *Server) health(w http.ResponseWriter, _ *http.Request) {
 // probe that only proves the HTTP server is listening would keep a process in
 // rotation that cannot do anything.
 //
-// The two conditions are reported separately because they need different
-// responses: a database that is down comes back on its own, and a schema that
-// does not match needs someone to deploy or roll back. The reason strings say
-// which, and neither of them names a table, a query or a DSN.
+// The two conditions are logged separately because they need different
+// operator responses: a database that is down comes back on its own, and a
+// schema that does not match needs someone to deploy or roll back. The caller
+// gets only the unavailable category.
 func (s *Server) ready(w http.ResponseWriter, r *http.Request) {
 	if err := s.engine.DB().Ping(r.Context()); err != nil {
 		s.notReady(w, r, "database is not reachable", err)
@@ -106,13 +136,18 @@ func (s *Server) ready(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) notReady(w http.ResponseWriter, r *http.Request, reason string, err error) {
 	s.log.WarnContext(r.Context(), "not ready", "reason", reason, "error", err)
+	// The reason is answered, not just logged. These strings name no table, no
+	// query and no DSN — "database is not reachable" versus "database schema
+	// does not match this build" is the difference between waiting and
+	// deploying, and a probe that will not say which sends its reader to the
+	// logs of a process that is not taking traffic.
 	writeJSON(w, http.StatusServiceUnavailable, map[string]string{
 		"status": "unavailable", "reason": reason,
 	})
 }
 
 func (s *Server) listWorkflows(w http.ResponseWriter, r *http.Request) {
-	workflows, err := s.engine.ListWorkflows(r.Context(), intParam(r, "limit", 100))
+	workflows, err := s.engine.ListWorkflows(r.Context(), s.intParam(r, "limit", 100))
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -124,7 +159,7 @@ func (s *Server) listRuns(w http.ResponseWriter, r *http.Request) {
 	runs, err := s.engine.ListRuns(r.Context(), engine.ListRunsOptions{
 		Status:   engine.RunStatus(r.URL.Query().Get("status")),
 		Workflow: r.URL.Query().Get("workflow"),
-		Limit:    intParam(r, "limit", 50),
+		Limit:    s.intParam(r, "limit", 50),
 	})
 	if err != nil {
 		s.fail(w, r, err)
@@ -196,8 +231,9 @@ func (s *Server) runID(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool)
 	raw := chi.URLParam(r, "runID")
 	id, err := uuid.Parse(raw)
 	if err != nil {
-		// The caller's own input is echoed, which is safe, but nothing about
-		// the parse failure is: a malformed id says nothing about the system.
+		// The caller is told what shape the path takes, which is a fact about
+		// the API and not about this deployment. The id itself is not echoed:
+		// nothing about the parse failure says anything about the system.
 		writeJSON(w, http.StatusBadRequest, errorBody("run id must be a UUID"))
 		return uuid.Nil, false
 	}
@@ -217,10 +253,10 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
 		// The client went away or the request ran out of time; there is nobody
 		// to answer, and this is not an internal failure.
-		s.log.DebugContext(r.Context(), "request ended early", "path", r.URL.Path, "error", err)
+		s.log.DebugContext(r.Context(), "request ended early", "path", requestRoute(r), "error", err)
 	default:
 		s.log.ErrorContext(r.Context(), "request failed",
-			"path", r.URL.Path,
+			"path", requestRoute(r),
 			"request_id", middleware.GetReqID(r.Context()),
 			"error", err)
 		writeJSON(w, http.StatusInternalServerError, errorBody("internal error"))
@@ -239,11 +275,35 @@ func (s *Server) logRequests(next http.Handler) http.Handler {
 		}
 		s.log.InfoContext(r.Context(), "request",
 			"method", r.Method,
-			"path", r.URL.Path,
+			"path", requestRoute(r),
 			"status", ww.Status(),
 			"duration_ms", time.Since(start).Milliseconds(),
 			"request_id", middleware.GetReqID(r.Context()))
 	})
+}
+
+func (s *Server) recoverPanics(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func(ctx context.Context) {
+			if recovered := recover(); recovered != nil {
+				// Do not log the panic value: it can contain request-derived data,
+				// including a credential. The stack identifies the failing code.
+				s.log.ErrorContext(ctx, "request panicked",
+					"path", requestRoute(r),
+					"request_id", middleware.GetReqID(ctx),
+					"stack", string(debug.Stack()))
+				writeJSON(w, http.StatusInternalServerError, errorBody("internal error"))
+			}
+		}(r.Context())
+		next.ServeHTTP(w, r)
+	})
+}
+
+func requestRoute(r *http.Request) string {
+	if pattern := chi.RouteContext(r.Context()).RoutePattern(); pattern != "" {
+		return pattern
+	}
+	return "unmatched"
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {
@@ -263,18 +323,17 @@ func errorBody(message string) map[string]string {
 	return map[string]string{"error": message}
 }
 
-func intParam(r *http.Request, name string, fallback int) int {
+func (s *Server) intParam(r *http.Request, name string, fallback int) int {
 	raw := r.URL.Query().Get(name)
-	if raw == "" {
-		return fallback
+	v := fallback
+	if raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err == nil && parsed > 0 {
+			v = parsed
+		}
 	}
-	v, err := strconv.Atoi(raw)
-	if err != nil || v <= 0 {
-		return fallback
-	}
-	const maxLimit = 500
-	if v > maxLimit {
-		return maxLimit
+	if v > s.config.MaxLimit {
+		return s.config.MaxLimit
 	}
 	return v
 }
