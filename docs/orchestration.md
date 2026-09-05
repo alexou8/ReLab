@@ -12,9 +12,9 @@ information architecture, UX, integration, and the final call on any
 disagreement. GPT-5.6 Sol, reached through the official OpenAI Codex plugin for
 Claude Code, is the engineering co-orchestrator: it challenges plans, coordinates
 subagents, and implements cross-cutting backend work. Four project-scoped
-GPT-5.6 Luna agents do narrow work under Sol — `luna-explorer` (read-only
-investigation), `luna-implementer` (one bounded change), `luna-tester`
-(verification), and `luna-risk-reviewer` (read-only security and concurrency
+GPT-5.6 Luna agents do narrow work under Sol — `luna_explorer` (read-only
+investigation), `luna_implementer` (one bounded change), `luna_tester`
+(verification), and `luna_risk_reviewer` (read-only security and concurrency
 review).
 
 The rule that keeps it from producing conflicting edits: **one writer per file
@@ -31,6 +31,20 @@ edit overlapping paths.
 
 Neither file carries a credential, and neither is intended to. Nothing in the Go
 module or in any build or test depends on them.
+
+Two things the Codex CLI (0.153.4) enforces, found by running it rather than by
+reading the reference:
+
+- **Agent names take lowercase letters, digits and underscores only.** A
+  hyphenated name is rejected at spawn time with `agent_name must use only
+  lowercase letters, digits, and underscores`, and the parent silently retries
+  under a different name. Hence `luna_explorer`, not `luna-explorer`.
+- **The `model` key in the project `.codex/config.toml` is not applied.** Codex
+  run from this directory still reports its own default. Pass the parent model
+  explicitly — `codex exec -m gpt-5.6-sol`, or `--model gpt-5.6-sol` on the
+  plugin command — or set it in the user-level `~/.codex/config.toml`. The
+  project file's agent definitions *are* discovered; only the top-level model
+  default is ignored.
 
 ## Authentication
 
@@ -85,6 +99,12 @@ supervisor, or a Node toolchain: `make check`, `make scenarios`,
 `make crash-tests`, and the dashboard build. CI covers all four
 (`.github/workflows/ci.yml`); its result on this branch is the baseline for
 those, not a local claim.
+
+The orchestration path itself was exercised end to end: Opus started a Sol task
+(`gpt-5.6-sol`), Sol spawned `luna_explorer`, and the explorer's answers came
+back correct against the tree — `internal/engine/reaper.go` for lease expiry,
+`internal/store/redact.go` for DSN redaction, and `001_init.sql:119` for the
+`task_attempts` primary key.
 
 No benchmark, coverage, or recovery number is recorded here. The published
 numbers stay in `docs/benchmarks.md`, produced by `relab bench` on stated

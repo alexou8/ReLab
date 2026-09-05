@@ -1,4 +1,4 @@
-name = "luna-tester"
+name = "luna_tester"
 description = "Read-mostly verifier for ReLab changes and failure paths."
 model = "gpt-5.6-luna"
 model_reasoning_effort = "low"

@@ -122,10 +122,10 @@ the same file.
 |---|---|
 | Claude Opus | Scope, product direction, frontend information architecture, UX, visual design, integration, and the final decision on any disagreement |
 | GPT-5.6 Sol (Codex) | Backend engineering co-planning, challenging assumptions, coordinating Luna subagents, cross-cutting implementation |
-| `luna-explorer` | Read-only investigation; returns file references, never edits |
-| `luna-implementer` | One bounded implementation with focused tests |
-| `luna-tester` | Verification only; does not change production code |
-| `luna-risk-reviewer` | Read-only security, concurrency, migration, and data-loss review |
+| `luna_explorer` | Read-only investigation; returns file references, never edits |
+| `luna_implementer` | One bounded implementation with focused tests |
+| `luna_tester` | Verification only; does not change production code |
+| `luna_risk_reviewer` | Read-only security, concurrency, migration, and data-loss review |
 
 Rules:
 
@@ -151,6 +151,9 @@ Rules:
 
 Agent definitions live in `.codex/agents/`; project Codex settings in
 `.codex/config.toml`. Both are configuration only and contain no credentials.
+Agent names are underscore-only because the Codex runtime rejects hyphens, and
+the parent model has to be passed on the command line rather than read from the
+project config — see `docs/orchestration.md`.
 
 ## Secret handling
 
