@@ -115,6 +115,13 @@ export class ApiError extends Error {
     readonly endpoint: string,
     /** notFound distinguishes "no such run" from "the API is broken". */
     readonly notFound = false,
+    /**
+     * unreadable marks a reply that arrived and could not be used, as opposed
+     * to a control plane that was never reached. The distinction matters to
+     * whoever is reading the error: one is "start the server", the other is
+     * "this is not the API I think it is".
+     */
+    readonly unreadable = false,
   ) {
     super(message);
     this.name = "ApiError";
@@ -153,42 +160,106 @@ async function get<T>(path: string): Promise<T> {
   }
 }
 
+/**
+ * Shape checks at the one boundary where an unknown body arrives.
+ *
+ * `get` casts the parsed JSON to the type the caller asked for, which is a
+ * promise the response cannot keep: a control plane one version ahead, a proxy
+ * answering 200 with an error object, or a truncated body all parse fine and
+ * then throw somewhere inside a component, where the failure reads as a broken
+ * dashboard rather than as an unusable answer. These functions turn that into
+ * the same ApiError every other failure produces, so the page renders its error
+ * state and names the endpoint.
+ *
+ * They check the shape a page actually depends on — a list is a list, a counter
+ * is a number — and not every field. A missing optional field renders as a gap
+ * in a row, which is honest; a `.map` on a string is a stack trace.
+ */
+function badBody(path: string): ApiError {
+  return new ApiError(
+    "the reply parsed as JSON but is not the shape this dashboard reads",
+    path,
+    false,
+    true,
+  );
+}
+
+function expectArray<T>(value: unknown, path: string): T[] {
+  if (value === null || value === undefined) return [];
+  if (!Array.isArray(value)) throw badBody(path);
+  return value as T[];
+}
+
+function expectObject<T>(value: unknown, path: string): T {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw badBody(path);
+  }
+  return value as T;
+}
+
+function expectCounts(value: unknown, path: string): Record<string, number> {
+  const map = expectObject<Record<string, unknown>>(value, path);
+  for (const count of Object.values(map)) {
+    if (typeof count !== "number") throw badBody(path);
+  }
+  return map as Record<string, number>;
+}
+
 export async function fetchStats(): Promise<Stats> {
   if (mode() === "demo") return snapshot().stats;
-  return get<Stats>("/api/v1/stats");
+  const path = "/api/v1/stats";
+  const body = expectObject<Record<string, unknown>>(await get(path), path);
+  if (
+    typeof body.queue_depth !== "number" ||
+    typeof body.dead_letters !== "number"
+  ) {
+    throw badBody(path);
+  }
+  return {
+    runs_by_status: expectCounts(body.runs_by_status ?? {}, path),
+    tasks_by_status: expectCounts(body.tasks_by_status ?? {}, path),
+    workers_by_status: expectCounts(body.workers_by_status ?? {}, path),
+    queue_depth: body.queue_depth,
+    dead_letters: body.dead_letters,
+  };
 }
 
 export async function fetchRuns(limit = 50): Promise<Run[]> {
   if (mode() === "demo") {
     return snapshot().runs.map((r) => r.run).slice(0, limit);
   }
-  const body = await get<{ runs: Run[] | null }>(`/api/v1/runs?limit=${limit}`);
-  return body.runs ?? [];
+  const path = `/api/v1/runs?limit=${limit}`;
+  const body = expectObject<{ runs?: unknown }>(await get(path), path);
+  return expectArray<Run>(body.runs, path);
 }
 
 export async function fetchRun(id: string): Promise<Run> {
   if (mode() === "demo") return demoRun(id).run;
-  return get<Run>(`/api/v1/runs/${id}`);
+  const path = `/api/v1/runs/${id}`;
+  const run = expectObject<Run>(await get(path), path);
+  if (typeof run.ID !== "string") throw badBody(path);
+  return run;
 }
 
 export async function fetchTasks(id: string): Promise<Task[]> {
   if (mode() === "demo") return demoRun(id).tasks;
-  const body = await get<{ tasks: Task[] | null }>(`/api/v1/runs/${id}/tasks`);
-  return body.tasks ?? [];
+  const path = `/api/v1/runs/${id}/tasks`;
+  const body = expectObject<{ tasks?: unknown }>(await get(path), path);
+  return expectArray<Task>(body.tasks, path);
 }
 
 export async function fetchEvents(id: string): Promise<RunEvent[]> {
   if (mode() === "demo") return demoRun(id).events;
-  const body = await get<{ events: RunEvent[] | null }>(
-    `/api/v1/runs/${id}/events`,
-  );
-  return body.events ?? [];
+  const path = `/api/v1/runs/${id}/events`;
+  const body = expectObject<{ events?: unknown }>(await get(path), path);
+  return expectArray<RunEvent>(body.events, path);
 }
 
 export async function fetchWorkers(): Promise<Worker[]> {
   if (mode() === "demo") return snapshot().workers;
-  const body = await get<{ workers: Worker[] | null }>("/api/v1/workers");
-  return body.workers ?? [];
+  const path = "/api/v1/workers";
+  const body = expectObject<{ workers?: unknown }>(await get(path), path);
+  return expectArray<Worker>(body.workers, path);
 }
 
 /**

@@ -406,6 +406,14 @@ Assertions are answered from the event journal, never from counters the runtime
 kept as it went: a counter records what the code that increments it noticed.
 `faults_injected` exists so a scenario cannot pass because nothing happened.
 
+`duplicate_effects` is the one that cannot be answered from the journal alone,
+and it is worth saying why. A duplicate effect is by definition one the ledger
+did *not* suppress, so it leaves no event behind; it is found by comparing the
+attempts that performed effects against the rows the ledger holds and the
+suppressions the journal recorded. That comparison reads two tables
+(`internal/cli/test.go`). Everything else — run status, lost tasks, recovery
+time, faults injected — comes from replaying the events.
+
 `relab test` refuses probability-driven scenarios unless `--allow-random` is
 passed, because a corpus entry that passes or fails by luck is not a regression
 test.
@@ -506,3 +514,11 @@ and the residual risks: [`docs/deployment.md`](docs/deployment.md).
 | [`docs/benchmarks.md`](docs/benchmarks.md) | Measured numbers, with methodology |
 | [`docs/deployment.md`](docs/deployment.md) | How it is deployed, and what the deployment does not do |
 | [`docs/orchestration.md`](docs/orchestration.md) | How the agents developing this repository are set up and coordinated |
+
+---
+
+## License
+
+[Apache License 2.0](LICENSE). Permissive, with an explicit patent grant, which
+is the thing that matters to anyone adopting a reliability tool inside a
+company.
