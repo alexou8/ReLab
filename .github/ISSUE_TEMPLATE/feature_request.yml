@@ -1,0 +1,36 @@
+name: Feature or change request
+description: Propose something ReLab should do, or do differently
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ReLab is a reliability testing and replay tool for development, staging
+        and CI — deliberately not a production workflow engine. A proposal that
+        moves it towards being one is a scope conversation, and this is the
+        right place to have it before any code is written.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What you were trying to do, and where ReLab got in the way.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you propose
+      description: What it would do. If you know how it would be tested, say that too.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you tried or considered instead
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - label: I have read the "What ReLab is not" section of the README, and this fits inside it — or I have said above why the boundary should move
+          required: true

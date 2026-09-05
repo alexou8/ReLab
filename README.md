@@ -514,6 +514,10 @@ and the residual risks: [`docs/deployment.md`](docs/deployment.md).
 | [`docs/benchmarks.md`](docs/benchmarks.md) | Measured numbers, with methodology |
 | [`docs/deployment.md`](docs/deployment.md) | How it is deployed, and what the deployment does not do |
 | [`docs/orchestration.md`](docs/orchestration.md) | How the agents developing this repository are set up and coordinated |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | How to get a working checkout, and what review will ask about |
+| [`CHANGELOG.md`](CHANGELOG.md) | What changed, and what is still unreleased |
+| [`SUPPORT.md`](SUPPORT.md) | Where to ask, and what support honestly means here |
+| [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) | Contributor Covenant 2.1 |
 
 ---
 

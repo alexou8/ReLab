@@ -8,6 +8,33 @@ anything.
 That is a scope decision, not an oversight, and this document exists so nobody
 has to discover it by reading the code.
 
+## Reporting a vulnerability
+
+**Do not open a public issue.** Report privately through GitHub's
+[private vulnerability reporting form](https://github.com/alexou8/relab/security/advisories/new),
+which opens a draft advisory only the maintainers can see.
+
+Useful to include: what an attacker can do, the version or commit, and the
+smallest reproduction you have. Please do not include a credential, a token, or
+a production connection string — a redacted DSN is enough, and this repository
+is public the moment an advisory is published.
+
+What to expect: ReLab is maintained by one person, so there is no response-time
+commitment, but security reports take priority over everything else. You will
+get an acknowledgement, an assessment of whether it is in scope, and — if it is
+— a fix and a credited advisory unless you would rather not be named.
+
+**In scope:** anything that lets someone bypass a stated boundary in this
+document, corrupt or lose journal data, escalate from the dashboard to the
+control plane, or execute code from workflow or scenario input.
+
+**Out of scope, because they are documented above and below rather than
+accidents:** the absence of API authentication and authorisation in v1, an
+unauthenticated control plane being readable by whoever can reach it, and
+anything that requires database access, which is already full control. If you
+think one of those *should* be in scope, that is a roadmap issue and a welcome
+one — file it publicly.
+
 ## Threat model
 
 **Intended deployment:** a developer's machine, or a CI runner, on a private
