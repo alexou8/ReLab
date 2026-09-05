@@ -7,6 +7,7 @@ const SECTIONS = [
   { href: "/", label: "Overview" },
   { href: "/runs", label: "Runs" },
   { href: "/workers", label: "Workers" },
+  { href: "/glossary", label: "Glossary" },
 ];
 
 const REPO = "https://github.com/alexou8/relab";

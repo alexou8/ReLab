@@ -256,6 +256,19 @@ was not measured.
 
 ## Quick start
 
+**One command, if you have a PostgreSQL** — the whole argument, start to finish:
+
+```bash
+relab demo
+```
+
+It registers a three-step workflow, starts two worker processes, kills the one
+holding the `charge` step after it has charged and before it could acknowledge,
+and reads back what the journal recorded: the task came back, the charge was not
+repeated, the run succeeded. The workflow and the scenario travel inside the
+binary — the same two files the test corpus runs — so nothing has to be checked
+out first.
+
 **With Docker** (nothing else needed):
 
 ```bash
@@ -293,6 +306,7 @@ relab run cancel <run-id>
 relab runs list [--status] [--workflow]
 
 relab replay <run-id> [--diff]               # reconstruct state; --diff exits non-zero on divergence
+relab demo                                   # the whole story in one command
 relab test <workflow> --scenario <file>      # exit 0/1, for CI
 relab bench <workflow> --workers N --fault-rate P --runs M
 
@@ -366,9 +380,12 @@ return nil, sdk.Permanent(fmt.Errorf("malformed row %d: %w", i, err))
 
 ## Fault injection
 
-Five fault types, each a **real degradation** rather than a flag the scheduler
-consults — a fault the scheduler knows about is one it can be written to survive
-without the recovery path ever running.
+Five fault types, none of them a flag the scheduler consults — a fault the
+scheduler knows about is one it can be written to survive without the recovery
+path ever running. `worker-crash` and `latency` degrade the real system:
+a real `SIGKILL`, and a real delay that pushes the task towards its lease.
+`http-error`, `db-disconnect` and `duplicate-delivery` produce the failure the
+dependency would have produced, at the point the task would have seen it.
 
 | Type | What it does |
 |---|---|
@@ -376,7 +393,7 @@ without the recovery path ever running.
 | `duplicate-delivery` | Invokes the handler again after the task completed, as a re-delivered message would |
 | `latency` | Really sleeps, pushing the task towards its lease and timeout |
 | `http-error` | Fails the task as an outbound call would |
-| `db-disconnect` | Fails the task as a dropped connection would |
+| `db-disconnect` | Fails the task as a dropped connection would. It reports the failure rather than closing the worker's shared pool, which would take out every other task on that worker and make the scenario test several things at once |
 
 A sixth, `queue-overload`, is named in the code and **not implemented**. Queue
 contention is a property of the whole pool rather than of one task, so it does
@@ -402,6 +419,14 @@ assert:
 Assertions are answered from the event journal, never from counters the runtime
 kept as it went: a counter records what the code that increments it noticed.
 `faults_injected` exists so a scenario cannot pass because nothing happened.
+
+`duplicate_effects` is the one that cannot be answered from the journal alone,
+and it is worth saying why. A duplicate effect is by definition one the ledger
+did *not* suppress, so it leaves no event behind; it is found by comparing the
+attempts that performed effects against the rows the ledger holds and the
+suppressions the journal recorded. That comparison reads two tables
+(`internal/cli/test.go`). Everything else — run status, lost tasks, recovery
+time, faults injected — comes from replaying the events.
 
 `relab test` refuses probability-driven scenarios unless `--allow-random` is
 passed, because a corpus entry that passes or fails by luck is not a regression
@@ -468,9 +493,12 @@ With `RELAB_API_URL` unset the dashboard needs no backend at all — it serves t
 recording. With it set, every page reads that control plane, on the server, so
 the browser never talks to the API and never sees the URL.
 
-**The API has no authentication.** Reachability is the entire access control, so
-a publicly reachable control plane is a publicly readable one. Deploy it on a
-private network or accept that.
+**The API takes shared bearer tokens, and nothing more.** Set
+`RELAB_API_TOKENS` to `viewer:<token>` or `operator:<token>` entries; a server
+asked to bind a non-loopback address without them refuses to start unless
+`RELAB_INSECURE_NO_AUTH=true` is set deliberately. There are no accounts, no
+sessions, no expiry and no per-token audit trail, so treat a token as a shared
+password for the whole read API.
 
 Full detail, including health checks, migration and rollback, production timings
 and the residual risks: [`docs/deployment.md`](docs/deployment.md).
@@ -500,5 +528,40 @@ and the residual risks: [`docs/deployment.md`](docs/deployment.md).
 | [`CLAUDE.md`](CLAUDE.md) | Conventions for changing this repository |
 | [`AGENTS.md`](AGENTS.md) | Sharp edges, and what to verify before calling work done |
 | [`SKILLS.md`](SKILLS.md) | Engineering practices this project holds itself to |
+| [`docs/guarantees.md`](docs/guarantees.md) | Every reliability claim, and the test that proves it |
+| [`docs/openapi.yaml`](docs/openapi.yaml) | The read API, described |
 | [`docs/benchmarks.md`](docs/benchmarks.md) | Measured numbers, with methodology |
 | [`docs/deployment.md`](docs/deployment.md) | How it is deployed, and what the deployment does not do |
+| [`docs/operations.md`](docs/operations.md) | Metrics, alerts, backup and restore, and what is not measured |
+| [`docs/orchestration.md`](docs/orchestration.md) | How the agents developing this repository are set up and coordinated |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | How to get a working checkout, and what review will ask about |
+| [`CHANGELOG.md`](CHANGELOG.md) | What changed, and what is still unreleased |
+| [`SUPPORT.md`](SUPPORT.md) | Where to ask, and what support honestly means here |
+| [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) | Contributor Covenant 2.1 |
+
+---
+
+## Releases
+
+Versions are tagged `vMAJOR.MINOR.PATCH` and cut by pushing the tag: the
+[release workflow](.github/workflows/release.yml) re-runs the full gate against
+the tagged commit — unit, scenario and process-level suites — and only then
+builds `linux/amd64`, `linux/arm64`, `darwin/amd64` and `darwin/arm64` binaries,
+a SHA-256 checksum file, an SPDX SBOM, and a multi-architecture container image
+at `ghcr.io/alexou8/relab`.
+
+```bash
+sha256sum -c relab_<version>_SHA256SUMS
+```
+
+Until `v1.0.0` the API, the CLI, the file formats and the SDK may change in a
+minor release, and every such change is listed in
+[`CHANGELOG.md`](CHANGELOG.md). What `v1.0.0` waits on is in the roadmap above.
+
+---
+
+## License
+
+[Apache License 2.0](LICENSE). Permissive, with an explicit patent grant, which
+is the thing that matters to anyone adopting a reliability tool inside a
+company.

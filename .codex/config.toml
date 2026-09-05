@@ -1,0 +1,12 @@
+# Project-scoped Codex configuration.
+#
+# This file carries no credentials. Codex authentication lives in the user's
+# private ~/.codex/auth.json and must never be committed here (see .gitignore).
+model = "gpt-5.6-sol"
+model_reasoning_effort = "medium"
+
+[agents]
+enabled = true
+max_concurrent_threads_per_session = 4
+default_subagent_model = "gpt-5.6-luna"
+default_subagent_reasoning_effort = "low"

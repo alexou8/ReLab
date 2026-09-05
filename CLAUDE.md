@@ -135,7 +135,14 @@ databases on. Without it, the database tests skip rather than fail.
   way.
 - Every query parameterised.
 - API error bodies carry a category, never an internal detail.
-- v1 has no authentication. Do not add a feature that assumes it does.
+- The API takes bearer tokens (`RELAB_API_TOKENS`, roles `viewer` and
+  `operator`) and refuses to serve unauthenticated on a non-loopback address
+  unless `RELAB_INSECURE_NO_AUTH=true` says so out loud. There are no user
+  accounts, no sessions, and no per-token audit trail; do not add a feature that
+  assumes any of those exist.
+- **This repository is public.** No credential, token, or `auth.json` belongs in
+  a tracked file, a prompt, an issue, a log, or CI output. Agent tooling signs
+  in through the user's private `~/.codex`; see AGENTS.md, "Secret handling".
 
 See `SECURITY.md` for the threat model and the residual risks.
 
@@ -180,6 +187,14 @@ When implementation changes, check whether `DATA.md`, `ARCHITECTURE.md`,
 `SECURITY.md` or `docs/reliability.md` is affected, and fix it in the same
 commit. Documentation drift here is worse than in most projects, because the
 documents are the product's argument.
+
+## Multi-agent development
+
+Claude Opus owns scope, product, and frontend; GPT-5.6 Sol co-orchestrates
+backend engineering through the Codex plugin; bounded Luna subagents do the
+narrow work. One writer per file or subsystem at a time. The full split, the
+task-packet rules, and the secret-handling rules are in AGENTS.md; the agent
+definitions are in `.codex/`.
 
 ## When modifying this repository
 

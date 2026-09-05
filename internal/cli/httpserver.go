@@ -9,14 +9,34 @@ import (
 	"time"
 
 	"github.com/alexou8/relab/internal/api"
+	"github.com/alexou8/relab/internal/config"
 	"github.com/alexou8/relab/internal/engine"
 )
 
 // serveAPI runs the HTTP API until ctx ends, then drains in-flight requests.
+//
+// The bind address is validated against the API configuration before anything
+// listens. An unauthenticated ReLab reachable from a network is the failure
+// this project would most regret shipping, so it is refused at startup — with
+// an error naming both ways out — rather than left to whoever reads SECURITY.md.
 func serveAPI(ctx context.Context, eng *engine.Engine, addr string, log *slog.Logger, version string) error {
+	apiConfig, err := config.APIConfigFromEnv()
+	if err != nil {
+		return err
+	}
+	if err := apiConfig.ValidateBind(addr); err != nil {
+		return err
+	}
+	if len(apiConfig.Tokens) == 0 {
+		log.WarnContext(ctx, "api is unauthenticated",
+			"addr", addr,
+			"set", config.EnvAPITokens,
+			"detail", "anyone who can reach this address can read every run")
+	}
+
 	srv := &http.Server{
 		Addr:    addr,
-		Handler: api.NewServer(eng, log, version).Routes(),
+		Handler: api.NewServer(eng, log, version, apiConfig).Routes(),
 		// Without these a single stalled client holds a connection and a
 		// goroutine indefinitely. ReadHeaderTimeout in particular is what
 		// closes the slowloris hole.

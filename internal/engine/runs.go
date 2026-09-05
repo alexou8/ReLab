@@ -216,6 +216,40 @@ func (e *Engine) Tasks(ctx context.Context, runID uuid.UUID) ([]Task, error) {
 	return tasksOf(ctx, e.db.Conn(), runID)
 }
 
+// TasksPage returns one bounded page of a run's tasks in task-name order.
+// afterTask is exclusive; an empty value starts at the beginning.
+func (e *Engine) TasksPage(ctx context.Context, runID uuid.UUID, afterTask string, limit int) ([]Task, bool, error) {
+	if limit <= 0 {
+		limit = 1
+	}
+	rows, err := e.db.Conn().Query(ctx,
+		`SELECT `+taskColumns+` FROM tasks
+		 WHERE run_id = $1 AND task_name > $2
+		 ORDER BY task_name
+		 LIMIT $3`, runID, afterTask, limit+1)
+	if err != nil {
+		return nil, false, fmt.Errorf("engine: list task page of run %s: %w", runID, store.Classify(err))
+	}
+	defer rows.Close()
+
+	tasks := make([]Task, 0, limit+1)
+	for rows.Next() {
+		t, err := scanTask(rows)
+		if err != nil {
+			return nil, false, fmt.Errorf("engine: scan task page: %w", store.Classify(err))
+		}
+		tasks = append(tasks, t)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, false, fmt.Errorf("engine: list task page of run %s: %w", runID, store.Classify(err))
+	}
+	hasMore := len(tasks) > limit
+	if hasMore {
+		tasks = tasks[:limit]
+	}
+	return tasks, hasMore, nil
+}
+
 func tasksOf(ctx context.Context, conn store.Conn, runID uuid.UUID) ([]Task, error) {
 	rows, err := conn.Query(ctx,
 		`SELECT `+taskColumns+` FROM tasks WHERE run_id = $1 ORDER BY created_at, task_name`, runID)
@@ -241,6 +275,51 @@ func tasksOf(ctx context.Context, conn store.Conn, runID uuid.UUID) ([]Task, err
 // Events returns a run's journal.
 func (e *Engine) Events(ctx context.Context, runID uuid.UUID) ([]event.Event, error) {
 	return event.Read(ctx, e.db.Conn(), runID)
+}
+
+// EventsPage returns one bounded page of a run's journal in sequence order.
+// afterSeq is exclusive; an empty history is a valid empty page.
+func (e *Engine) EventsPage(ctx context.Context, runID uuid.UUID, afterSeq int64, limit int) ([]event.Event, bool, error) {
+	if limit <= 0 {
+		limit = 1
+	}
+	rows, err := e.db.Conn().Query(ctx, `
+		SELECT seq, type, coalesce(task_name, ''), worker_id, payload, occurred_at
+		FROM events
+		WHERE run_id = $1 AND seq > $2
+		ORDER BY seq
+		LIMIT $3`, runID, afterSeq, limit+1)
+	if err != nil {
+		return nil, false, fmt.Errorf("engine: read event page for run %s: %w", runID, store.Classify(err))
+	}
+	defer rows.Close()
+
+	events := make([]event.Event, 0, limit+1)
+	expected := afterSeq + 1
+	for rows.Next() {
+		evt := event.Event{RunID: runID}
+		var typ string
+		if err := rows.Scan(&evt.Seq, &typ, &evt.TaskName, &evt.WorkerID, &evt.Payload, &evt.OccurredAt); err != nil {
+			return nil, false, fmt.Errorf("engine: scan event page for run %s: %w", runID, store.Classify(err))
+		}
+		if evt.Seq != expected {
+			return nil, false, &event.ErrGap{RunID: runID, Expected: expected, Found: evt.Seq}
+		}
+		expected++
+		evt.Type = event.Type(typ)
+		if !evt.Type.Known() {
+			return nil, false, &event.ErrUnknownType{Type: evt.Type, RunID: runID.String(), Seq: evt.Seq}
+		}
+		events = append(events, evt)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, false, fmt.Errorf("engine: iterate event page for run %s: %w", runID, store.Classify(err))
+	}
+	hasMore := len(events) > limit
+	if hasMore {
+		events = events[:limit]
+	}
+	return events, hasMore, nil
 }
 
 func nullString(s string) *string {

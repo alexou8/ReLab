@@ -228,3 +228,65 @@ D.9 docs/deployment.md written; SECURITY.md, ARCHITECTURE  | orchestrator | done
 **Not done:** the Vercel project itself. The connected account cannot create
 projects, so the import is a manual step; every setting it needs is pinned in
 `web/vercel.json` and written out in `docs/deployment.md` §3.
+
+---
+
+## Public product surface and the self-hosted boundary
+
+Work done under the Claude/Codex orchestration plan: Opus owning product,
+frontend and integration, GPT-5.6 Sol implementing bounded engineering slices
+under review, and Luna subagents doing narrow investigation. `docs/orchestration.md`
+records the arrangement; `AGENTS.md` holds the rules.
+
+```
+E.1 .codex config, four Luna agent definitions, and the  | opus         | done | .codex/, AGENTS.md, CLAUDE.md
+    one-writer-per-subsystem rule                        |              |      |
+E.2 credential hygiene for a public repository: auth     | opus         | done | .gitignore, AGENTS.md
+    .json and .env excluded, secret-handling rules       |              |      |
+E.3 dashboard glossary, recovery flow and audience       | opus         | done | web/
+    sections; five claims the code did not support       |              |      |
+    corrected after Sol audited them                     |              |      |
+E.4 a malformed API reply took every page down; response | opus         | done | web/src/lib/api.ts
+    shapes now checked at the boundary                   |              |      |
+E.5 LICENSE (Apache-2.0), CONTRIBUTING, CODE_OF_CONDUCT, | opus         | done | (root), .github/
+    SUPPORT, CHANGELOG, issue and PR templates, and a    |              |      |
+    vulnerability reporting policy                       |              |      |
+E.6 docs/openapi.yaml, with a test comparing it against  | opus         | done | docs/, internal/api
+    the structs the handlers return                      |              |      |
+E.7 docs/guarantees.md: every claim beside its test,     | opus         | done | docs/, test/docs
+    plus what no test proves; test/docs fails on a       |              |      |
+    citation that does not exist                         |              |      |
+E.8 `relab demo`: the whole story in one command, with   | opus         | done | internal/cli
+    the workflow and scenario embedded                   |              |      |
+E.9 release workflow: gate, binaries, checksums, SBOM,   | opus         | done | .github/workflows
+    multi-arch image, on a tag                           |              |      |
+E.A API bearer tokens, roles, fail-closed non-loopback   | sol + opus   | done | internal/api, internal/config
+    bind, body/limit caps, rate limiting                 |              |      |
+E.B rate limiter locked out every new client once its    | opus         | done | internal/api
+    client map filled; refilled buckets now evicted      |              |      |
+E.C docs/operations.md: instruments, alerts, backup and  | opus         | done | docs/
+    restore, and what is not measured                    |              |      |
+```
+
+**Acceptance:** verified against a real PostgreSQL — `go test -race ./...`,
+`make scenarios` and `make crash-tests` all pass — and then against a running
+server: a non-loopback bind with no tokens refuses to start, loopback with no
+tokens serves, no token and a wrong token are both 401 with identical bodies,
+the right token is 200, `/healthz` needs none, the configured burst yields
+429 with `Retry-After`, and no token appears in any log line.
+
+**Not done, and why:**
+
+- **No load or soak testing, and no new benchmark numbers.** `docs/benchmarks.md`
+  still reports the measured matrix on its stated hardware. Numbers taken on a
+  shared cloud VM would be worse than no numbers.
+- **No Grafana dashboard JSON.** The alerts and instrument meanings are written
+  down in `docs/operations.md`; a dashboard nobody has looked at a real incident
+  through would be decoration.
+- **No external user validation.** Milestone 5 of the plan needs real people
+  running the quick start, which cannot be manufactured.
+- **The release workflow has never run.** It needs a tag and repository
+  permissions, so it is unproven until the first release.
+- **No audit-event log, retention policy, or per-token identity.** State-changing
+  endpoints do not exist yet, so an audit trail would record only reads; when
+  they arrive, this is the first thing they need.

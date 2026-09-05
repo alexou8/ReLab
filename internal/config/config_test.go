@@ -148,3 +148,118 @@ func TestDurationRejectsAUnitlessValue(t *testing.T) {
 			"instead of 500ms would look like a scheduler bug", err)
 	}
 }
+
+func clearAPIEnv(t *testing.T) {
+	t.Helper()
+	for _, key := range []string{
+		config.EnvAPITokens, config.EnvInsecureNoAuth, config.EnvAPIMaxBodyBytes,
+		config.EnvAPIMaxLimit, config.EnvAPIRateLimit, config.EnvAPIRateBurst,
+	} {
+		t.Setenv(key, "")
+	}
+}
+
+func TestAPIConfigFromEnvDefaultsAndTokens(t *testing.T) {
+	clearAPIEnv(t)
+	t.Setenv(config.EnvAPITokens, "viewer:alpha-secret, operator:beta:secret")
+	got, err := config.APIConfigFromEnv()
+	if err != nil {
+		t.Fatalf("APIConfigFromEnv: %v", err)
+	}
+	if len(got.Tokens) != 2 || got.Tokens[0] != (config.APIToken{Value: "alpha-secret", Role: config.RoleViewer}) ||
+		got.Tokens[1] != (config.APIToken{Value: "beta:secret", Role: config.RoleOperator}) {
+		t.Fatalf("APIConfigFromEnv parsed tokens as %#v; token roles and values must be preserved", got.Tokens)
+	}
+	if got.MaxBodyBytes != config.DefaultAPIMaxBodyBytes || got.MaxLimit != config.DefaultAPIMaxLimit ||
+		got.RateLimitPerSecond != config.DefaultAPIRateLimit || got.RateLimitBurst != config.DefaultAPIRateBurst {
+		t.Fatalf("APIConfigFromEnv defaults are %#v; request protections must have documented defaults", got)
+	}
+}
+
+func TestAPIConfigFromEnvRejectsMalformedSecretsAndValues(t *testing.T) {
+	tests := []struct {
+		name  string
+		key   string
+		value string
+		want  string
+	}{
+		{"empty role", config.EnvAPITokens, ":secret-value", "invalid token entry"},
+		{"empty token", config.EnvAPITokens, "viewer:", "invalid token entry"},
+		{"unknown role", config.EnvAPITokens, "admin:secret-value", "unknown role"},
+		{"duplicate token", config.EnvAPITokens, "viewer:secret-value,operator:secret-value", "duplicate token"},
+		{"malformed boolean", config.EnvInsecureNoAuth, "sometimes", "must be a boolean"},
+		{"nonpositive body size", config.EnvAPIMaxBodyBytes, "0", "max body bytes must be positive"},
+		{"nonpositive list limit", config.EnvAPIMaxLimit, "-1", "max limit must be positive"},
+		{"nonpositive rate", config.EnvAPIRateLimit, "0", "rate limit must be positive"},
+		{"nonpositive burst", config.EnvAPIRateBurst, "0", "rate burst must be positive"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clearAPIEnv(t)
+			t.Setenv(tt.key, tt.value)
+			_, err := config.APIConfigFromEnv()
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("APIConfigFromEnv returned %v; must reject %s to protect the API boundary", err, tt.name)
+			}
+			if strings.Contains(err.Error(), "secret-value") {
+				t.Fatalf("APIConfigFromEnv error %q leaks a configured token", err)
+			}
+		})
+	}
+}
+
+func TestAPIConfigValidateBindProtectsUnauthenticatedExposure(t *testing.T) {
+	tests := []struct {
+		name    string
+		api     config.APIConfig
+		addr    string
+		wantErr bool
+	}{
+		{"empty host is non-loopback", config.DefaultAPIConfig(), ":8080", true},
+		{"wildcard IPv4 is non-loopback", config.DefaultAPIConfig(), "0.0.0.0:8080", true},
+		{"wildcard IPv6 is non-loopback", config.DefaultAPIConfig(), "[::]:8080", true},
+		{"loopback IPv4 is allowed", config.DefaultAPIConfig(), "127.0.0.1:8080", false},
+		{"loopback IPv6 is allowed", config.DefaultAPIConfig(), "[::1]:8080", false},
+		{"localhost is allowed", config.DefaultAPIConfig(), "localhost:8080", false},
+		{"token allows public bind", config.APIConfig{Tokens: []config.APIToken{{Value: "x", Role: config.RoleViewer}}}, ":8080", false},
+		{"explicit opt out allows public bind", config.APIConfig{InsecureNoAuth: true}, ":8080", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.api.ValidateBind(tt.addr)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("ValidateBind(%q) returned %v; must protect the unauthenticated bind boundary", tt.addr, err)
+			}
+			if err != nil && (!strings.Contains(err.Error(), config.EnvAPITokens) || !strings.Contains(err.Error(), config.EnvInsecureNoAuth)) {
+				t.Fatalf("ValidateBind error %q must name both safe configuration fixes", err)
+			}
+		})
+	}
+}
+
+func TestAPIConfigValidateRejectsProgrammaticInvalidTokensWithoutLeakingThem(t *testing.T) {
+	tests := []struct {
+		name   string
+		tokens []config.APIToken
+	}{
+		{name: "empty token", tokens: []config.APIToken{{Role: config.RoleViewer}}},
+		{name: "unknown role", tokens: []config.APIToken{{Value: "secret-value", Role: "admin"}}},
+		{name: "duplicate token", tokens: []config.APIToken{
+			{Value: "secret-value", Role: config.RoleViewer},
+			{Value: "secret-value", Role: config.RoleOperator},
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			api := config.DefaultAPIConfig()
+			api.Tokens = tt.tokens
+			err := api.Validate()
+			if err == nil {
+				t.Fatalf("APIConfig.Validate accepted %s; programmatic configuration must enforce the authentication boundary", tt.name)
+			}
+			if strings.Contains(err.Error(), "secret-value") {
+				t.Fatalf("APIConfig.Validate error %q leaks a bearer token", err)
+			}
+		})
+	}
+}

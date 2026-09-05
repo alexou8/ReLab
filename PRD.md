@@ -173,10 +173,13 @@ The dashboard is a debugging tool that someone reads under stress, so:
 
 ## Security requirements
 
-v1 has no authentication and is intended for a private network. The full threat
-model, the residual risks and their mitigations are in `SECURITY.md`. The
-requirement that *is* met: no credential is ever logged, and the DSN is redacted
-from driver errors.
+v1 authenticates the read API with shared bearer tokens in two roles, and
+refuses to serve unauthenticated on a non-loopback address unless the operator
+sets `RELAB_INSECURE_NO_AUTH=true`. There are no accounts, no sessions and no
+per-token audit identity; it remains a tool for development, staging and CI
+rather than a multi-tenant service. The full threat model, the residual risks
+and their mitigations are in `SECURITY.md`. Also met: no credential is ever
+logged, and the DSN is redacted from driver errors.
 
 ## Performance requirements
 

@@ -9,8 +9,10 @@ package config
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -114,7 +116,215 @@ const (
 	EnvOTLPEndpoint      = "RELAB_OTLP_ENDPOINT"
 	EnvWorkerConcurrency = "RELAB_WORKER_CONCURRENCY"
 	EnvDBMaxConns        = "RELAB_DB_MAX_CONNS"
+	EnvAPITokens         = "RELAB_API_TOKENS"
+	EnvInsecureNoAuth    = "RELAB_INSECURE_NO_AUTH"
+	EnvAPIMaxBodyBytes   = "RELAB_API_MAX_BODY_BYTES"
+	EnvAPIMaxLimit       = "RELAB_API_MAX_LIMIT"
+	EnvAPIRateLimit      = "RELAB_API_RATE_LIMIT"
+	EnvAPIRateBurst      = "RELAB_API_RATE_BURST"
 )
+
+// APIRole controls which authenticated API operations a token may perform.
+type APIRole string
+
+const (
+	// RoleViewer permits read-only API operations.
+	RoleViewer APIRole = "viewer"
+	// RoleOperator permits viewer operations and is reserved for future
+	// state-changing API operations.
+	RoleOperator APIRole = "operator"
+)
+
+// APIToken is one API bearer token and its authorization role.
+type APIToken struct {
+	Value string
+	Role  APIRole
+}
+
+// APIConfig contains the security and request-limit settings for the read API.
+type APIConfig struct {
+	Tokens             []APIToken
+	InsecureNoAuth     bool
+	MaxBodyBytes       int64
+	MaxLimit           int
+	RateLimitPerSecond int
+	RateLimitBurst     int
+}
+
+const (
+	// DefaultAPIMaxBodyBytes bounds request bodies at one mebibyte.
+	DefaultAPIMaxBodyBytes int64 = 1 << 20
+	// DefaultAPIMaxLimit bounds list endpoint limit parameters.
+	DefaultAPIMaxLimit = 500
+	// DefaultAPIRateLimit is the default sustained requests-per-second limit per
+	// token or client IP.
+	DefaultAPIRateLimit = 10
+	// DefaultAPIRateBurst is the default short-term request burst per token or
+	// client IP.
+	DefaultAPIRateBurst = 20
+)
+
+// DefaultAPIConfig returns the secure-by-default API settings.
+func DefaultAPIConfig() APIConfig {
+	return APIConfig{
+		MaxBodyBytes:       DefaultAPIMaxBodyBytes,
+		MaxLimit:           DefaultAPIMaxLimit,
+		RateLimitPerSecond: DefaultAPIRateLimit,
+		RateLimitBurst:     DefaultAPIRateBurst,
+	}
+}
+
+// APIConfigFromEnv loads API settings from the environment and validates all values.
+// Token values are deliberately omitted from every parse error.
+func APIConfigFromEnv() (APIConfig, error) {
+	api := DefaultAPIConfig()
+	if raw := os.Getenv(EnvAPITokens); raw != "" {
+		var err error
+		api.Tokens, err = parseAPITokens(raw)
+		if err != nil {
+			return APIConfig{}, err
+		}
+	}
+	var err error
+	if api.InsecureNoAuth, err = Bool(EnvInsecureNoAuth, false); err != nil {
+		return APIConfig{}, err
+	}
+	if api.MaxBodyBytes, err = Int64(EnvAPIMaxBodyBytes, DefaultAPIMaxBodyBytes); err != nil {
+		return APIConfig{}, err
+	}
+	if api.MaxLimit, err = Int(EnvAPIMaxLimit, DefaultAPIMaxLimit); err != nil {
+		return APIConfig{}, err
+	}
+	if api.RateLimitPerSecond, err = Int(EnvAPIRateLimit, DefaultAPIRateLimit); err != nil {
+		return APIConfig{}, err
+	}
+	if api.RateLimitBurst, err = Int(EnvAPIRateBurst, DefaultAPIRateBurst); err != nil {
+		return APIConfig{}, err
+	}
+	if err := api.Validate(); err != nil {
+		return APIConfig{}, err
+	}
+	return api, nil
+}
+
+// Validate rejects invalid API limits.
+func (a APIConfig) Validate() error {
+	if a.MaxBodyBytes <= 0 {
+		return fmt.Errorf("config: API max body bytes must be positive")
+	}
+	if a.MaxLimit <= 0 {
+		return fmt.Errorf("config: API max limit must be positive")
+	}
+	if a.RateLimitPerSecond <= 0 {
+		return fmt.Errorf("config: API rate limit must be positive")
+	}
+	if a.RateLimitBurst <= 0 {
+		return fmt.Errorf("config: API rate burst must be positive")
+	}
+	seen := make(map[string]struct{}, len(a.Tokens))
+	for _, token := range a.Tokens {
+		if token.Value == "" {
+			return fmt.Errorf("config: API token must not be empty")
+		}
+		if token.Role != RoleViewer && token.Role != RoleOperator {
+			return fmt.Errorf("config: API token has an unknown role")
+		}
+		if _, ok := seen[token.Value]; ok {
+			return fmt.Errorf("config: API tokens contain a duplicate")
+		}
+		seen[token.Value] = struct{}{}
+	}
+	return nil
+}
+
+// Bool returns a boolean environment variable, or a fallback. A present but
+// malformed value is an error rather than a silent fallback.
+func Bool(key string, fallback bool) (bool, error) {
+	raw := os.Getenv(key)
+	if raw == "" {
+		return fallback, nil
+	}
+	v, err := strconv.ParseBool(raw)
+	if err != nil {
+		return false, fmt.Errorf("config: %s must be a boolean", key)
+	}
+	return v, nil
+}
+
+// Int64 returns an int64 environment variable, or a fallback. A present but
+// malformed value is an error rather than a silent fallback.
+func Int64(key string, fallback int64) (int64, error) {
+	raw := os.Getenv(key)
+	if raw == "" {
+		return fallback, nil
+	}
+	v, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("config: %s must be an integer", key)
+	}
+	return v, nil
+}
+
+func parseAPITokens(raw string) ([]APIToken, error) {
+	entries := strings.Split(raw, ",")
+	tokens := make([]APIToken, 0, len(entries))
+	seen := make(map[string]struct{}, len(entries))
+	for _, entry := range entries {
+		parts := strings.SplitN(strings.TrimSpace(entry), ":", 2)
+		if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" {
+			return nil, fmt.Errorf("config: %s contains an invalid token entry", EnvAPITokens)
+		}
+		role, ok := parseRole(strings.TrimSpace(parts[0]))
+		if !ok {
+			return nil, fmt.Errorf("config: %s contains an unknown role", EnvAPITokens)
+		}
+		value := strings.TrimSpace(parts[1])
+		if _, ok := seen[value]; ok {
+			return nil, fmt.Errorf("config: %s contains a duplicate token", EnvAPITokens)
+		}
+		seen[value] = struct{}{}
+		tokens = append(tokens, APIToken{Value: value, Role: role})
+	}
+	return tokens, nil
+}
+
+func parseRole(raw string) (APIRole, bool) {
+	switch strings.ToLower(raw) {
+	case "viewer":
+		return RoleViewer, true
+	case "operator":
+		return RoleOperator, true
+	default:
+		return "", false
+	}
+}
+
+// ValidateBind rejects an unauthenticated non-loopback TCP bind unless the
+// operator explicitly opts into insecure exposure.
+func (a APIConfig) ValidateBind(addr string) error {
+	if len(a.Tokens) != 0 || a.InsecureNoAuth {
+		return nil
+	}
+	host := bindHost(addr)
+	if strings.EqualFold(host, "localhost") {
+		return nil
+	}
+	if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
+		return nil
+	}
+	return fmt.Errorf("config: refusing unauthenticated non-loopback bind %q; set %s or explicitly set %s=true", addr, EnvAPITokens, EnvInsecureNoAuth)
+}
+
+func bindHost(addr string) string {
+	addr = strings.TrimSpace(addr)
+	if host, _, err := net.SplitHostPort(addr); err == nil {
+		return strings.Trim(host, "[]")
+	}
+	if strings.HasPrefix(addr, "[") && strings.HasSuffix(addr, "]") {
+		return strings.Trim(addr, "[]")
+	}
+	return addr
+}
 
 // DSN returns the configured connection string. The flag wins over the
 // environment so that a one-off command can target another database without

@@ -1,0 +1,15 @@
+# A pipeline whose middle step performs a recorded side effect. It exists so the
+# duplicate-delivery scenario has something for the idempotency ledger to
+# suppress: a duplicate that touches nothing external proves nothing.
+name: effectful
+version: 1
+steps:
+  - name: import
+    handler: import_csv
+  - name: charge
+    handler: charge_once
+    depends_on: [import]
+    retry: {max_attempts: 3, initial_delay: 100ms, multiplier: 2, max_delay: 1s, jitter: 0}
+  - name: report
+    handler: summarize
+    depends_on: [charge]

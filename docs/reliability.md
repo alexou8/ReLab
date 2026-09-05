@@ -5,7 +5,10 @@ package documentation and this file disagree, this file is correct and the
 others are bugs.
 
 Every claim here is backed by a test named in the text. A claim without a test
-does not belong in this document.
+does not belong in this document. [`guarantees.md`](guarantees.md) is the same
+mapping as a table, together with how to run each test and an explicit list of
+what no test proves yet; `test/docs` fails the build if it cites a test that
+does not exist.
 
 ---
 
@@ -27,7 +30,8 @@ between leaving work stranded and running it twice. ReLab chooses to run it
 twice, and bounds the damage with the idempotency ledger.
 
 *Tested by:* `TestSIGKILLedWorkerLosesItsTaskAndTheRunStillSucceeds`,
-`TestLeaseExpiryRequeuesTheTask`.
+`TestLeaseExpiryRequeuesTheTask`,
+`TestFailingTaskRetriesThenDeadLettersAndFailsTheRun` for the retry case.
 
 ---
 
@@ -75,7 +79,10 @@ the case the idempotency ledger exists for.
 
 *Tested by:* `TestThreeWorkersProcessAFanOutWithoutDoubleExecution`,
 `TestConcurrentAttemptIsRefused`, and the `assertNoDuplicateAttempt` check in
-every process-level crash test.
+`TestSIGKILLedWorkerLosesItsTaskAndTheRunStillSucceeds` and
+`TestEffectSurvivesACrashBeforeAcknowledgement`. (It was previously described
+here as running in every process-level crash test, which it does not: two of
+the five call it.)
 
 ---
 
@@ -225,8 +232,10 @@ engine mid-run and builds a new one against the same database.
   handler logic.
 - **Not exactly-once.** See above.
 - **Not multi-region.** One PostgreSQL database is the whole system.
-- **Not authenticated.** v1 has no authentication or authorisation. See
-  `SECURITY.md`.
+- **Authenticated only by shared bearer tokens.** Two roles, no accounts, no
+  sessions, no expiry, and no per-token audit identity. A loopback deployment
+  may run with no tokens at all; a non-loopback one has to configure them or
+  declare itself insecure. See `SECURITY.md`.
 - **`queue-overload` is not implemented.** It is named in the code and rejected
   at scenario-parse time, so no scenario can silently run without it.
 - **Not a general-purpose task queue.** Throughput is bounded by one Postgres

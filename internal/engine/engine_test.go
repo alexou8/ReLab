@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
+
 	"github.com/alexou8/relab/internal/engine"
 	"github.com/alexou8/relab/internal/event"
 	"github.com/alexou8/relab/internal/store"
@@ -127,6 +129,99 @@ func TestRunSucceedsAndRecordsAnOrderedTimeline(t *testing.T) {
 	}
 	assertOrder(t, types, event.RunCreated, event.RunQueued, event.TaskLeased,
 		event.TaskStarted, event.TaskSucceeded, event.RunSucceeded)
+}
+
+func TestEventsPageWalksJournalWithoutGapsOrRepeats(t *testing.T) {
+	f := newFixture(t, diamondYAML, map[string]sdk.Handler{"ok": okHandler})
+	run := f.drive(f.start(engine.CreateRunOptions{}))
+	whole, err := f.eng.Events(f.ctx, run.ID)
+	if err != nil {
+		t.Fatalf("read complete journal: %v", err)
+	}
+	if len(whole) < 3 {
+		t.Fatalf("fixture journal has %d events, want enough for pagination", len(whole))
+	}
+
+	var walked []event.Event
+	var after int64
+	for {
+		page, more, err := f.eng.EventsPage(f.ctx, run.ID, after, 2)
+		if err != nil {
+			t.Fatalf("read page after %d: %v", after, err)
+		}
+		walked = append(walked, page...)
+		if len(page) == 0 {
+			if more {
+				t.Fatal("empty page reported more events")
+			}
+			break
+		}
+		if page[0].Seq != after+1 {
+			t.Fatalf("page started at seq %d after %d: pagination repeated or skipped an event", page[0].Seq, after)
+		}
+		after = page[len(page)-1].Seq
+		if !more {
+			break
+		}
+	}
+	if len(walked) != len(whole) {
+		t.Fatalf("walked %d events, complete journal has %d: pagination lost events", len(walked), len(whole))
+	}
+	for i := range whole {
+		if walked[i].Seq != whole[i].Seq {
+			t.Fatalf("walked event %d has seq %d, complete journal has %d", i, walked[i].Seq, whole[i].Seq)
+		}
+	}
+
+	page, more, err := f.eng.EventsPage(f.ctx, run.ID, 0, 100000)
+	if err != nil {
+		t.Fatalf("read capped-size page: %v", err)
+	}
+	if len(page) != len(whole) || more {
+		t.Fatalf("last page returned %d events and has_more=%t, want %d and false", len(page), more, len(whole))
+	}
+}
+
+func TestEventsPageAllowsEmptyJournal(t *testing.T) {
+	page, more, err := newFixture(t, linearYAML, map[string]sdk.Handler{"ok": okHandler}).eng.EventsPage(
+		context.Background(), uuid.Nil, 0, 2)
+	if err != nil {
+		t.Fatalf("empty journal read failed: %v", err)
+	}
+	if len(page) != 0 || more {
+		t.Fatalf("empty journal returned %d events and has_more=%t", len(page), more)
+	}
+}
+
+func TestTasksPageWalksRunWithoutGapsOrRepeats(t *testing.T) {
+	f := newFixture(t, diamondYAML, map[string]sdk.Handler{"ok": okHandler})
+	run := f.start(engine.CreateRunOptions{})
+	whole, err := f.eng.Tasks(f.ctx, run.ID)
+	if err != nil {
+		t.Fatalf("read complete task list: %v", err)
+	}
+
+	var walked []engine.Task
+	after := ""
+	for {
+		page, more, err := f.eng.TasksPage(f.ctx, run.ID, after, 2)
+		if err != nil {
+			t.Fatalf("read task page after %q: %v", after, err)
+		}
+		walked = append(walked, page...)
+		if len(page) == 0 || !more {
+			break
+		}
+		after = page[len(page)-1].Name
+	}
+	if len(walked) != len(whole) {
+		t.Fatalf("walked %d tasks, complete list has %d: pagination lost or repeated tasks", len(walked), len(whole))
+	}
+	for i := range whole {
+		if walked[i].Name != whole[i].Name {
+			t.Fatalf("walked task %d is %q, complete list has %q", i, walked[i].Name, whole[i].Name)
+		}
+	}
 }
 
 func TestFanInWaitsForEveryDependency(t *testing.T) {

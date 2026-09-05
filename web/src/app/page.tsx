@@ -4,6 +4,7 @@ import { evidenceOf, storyOf } from "@/lib/events";
 import { duration, short, time } from "@/lib/format";
 import { ErrorState } from "./error-state";
 import { Status } from "./status";
+import { RecoveryDiagram } from "./recovery-diagram";
 import { Story } from "./story";
 
 // The overview is the page someone leaves open while killing a worker, so it
@@ -88,7 +89,7 @@ export default async function Overview() {
           <h2>One real failure, start to finish</h2>
           <p className="lead">
             {headline.ScenarioName === "worker-crash-after-effect"
-              ? "A worker charged a customer, then was killed before it could acknowledge the task. Nobody told the system it had gone."
+              ? "A worker ran the workflow's charge step — a recorded effect standing in for a payment — and was killed before it could acknowledge the task. Nobody told the system it had gone."
               : `ReLab disrupted the ${headline.WorkflowName} workflow on purpose and recorded what followed.`}{" "}
             Every step below is an event from that run&rsquo;s journal, at its
             real sequence number and its real time.
@@ -135,11 +136,84 @@ export default async function Overview() {
           </ul>
           <p className="detail">
             &ldquo;We handle worker failure&rdquo; is either backed by a test
-            that kills a real process, or it is a hope. ReLab is that test: the
-            crashes are real <code>SIGKILL</code>s to real processes, and the
-            faults degrade the real system rather than standing in for it.
+            that kills a real process, or it is a hope. ReLab is that test: a
+            crash is a real <code>SIGKILL</code> to a real process, and a
+            latency fault really delays the task towards its lease. The
+            upstream-error and database-disconnect faults report the failure
+            the dependency would have produced rather than taking the
+            dependency down, so that a scenario tests what the scheduler does
+            with one failed task and not what a shared pool does to its
+            neighbours.
           </p>
         </div>
+      </section>
+
+      <section>
+        <h2>Who this is for</h2>
+        <div className="audience">
+          <div>
+            <h3>Use ReLab if you</h3>
+            <ul>
+              <li>
+                Run <b>background jobs or multi-step workflows</b> and have said
+                &ldquo;it retries&rdquo; without a test that proves it.
+              </li>
+              <li>
+                Need to show a reviewer that <b>killing a worker mid-task</b> is
+                survivable, on a real process rather than a mocked one.
+              </li>
+              <li>
+                Want a <b>reproducible failure</b> — same seed, same break — to
+                put in CI next to the happy-path tests.
+              </li>
+              <li>
+                Care whether a retry <b>charges a customer twice</b>, and want
+                the answer recorded rather than argued.
+              </li>
+            </ul>
+          </div>
+          <div>
+            <h3>ReLab is not</h3>
+            <ul>
+              <li>
+                <b>A production workflow engine.</b> No durable timers, no
+                signals, no queries, no versioned workflow code. v1 is a
+                self-hosted tool for development, staging and CI.
+              </li>
+              <li>
+                <b>A Temporal replacement.</b> Different job: this one breaks a
+                workflow on purpose and answers whether it recovered.
+              </li>
+              <li>
+                <b>Exactly-once.</b> The guarantee is at-least-once, and an
+                effect already recorded under a key is not performed again.
+                There is a window between performing an effect and recording it{" "}
+                — <Link href="/glossary">the glossary says where</Link>.
+              </li>
+              <li>
+                <b>Authenticated.</b> v1 has no API authentication, so nothing
+                here should be exposed to a network you do not control.
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>How a killed worker&rsquo;s task comes back</h2>
+        <p className="lead">
+          The mechanism, once, in order. Every stage names the event that
+          records it, so the picture can be checked against a real journal
+          rather than believed.
+        </p>
+        <RecoveryDiagram />
+        <p className="detail note">
+          Nothing in this sequence depends on the dying worker reporting
+          anything, which is the point: a process that has been{" "}
+          <code>SIGKILL</code>ed, or a machine that has lost power, gets no
+          chance to. <Link href="/glossary">What each of these words means</Link>
+          .
+        </p>
       </section>
 
       <section>
@@ -155,8 +229,8 @@ export default async function Overview() {
             disconnect.
           </PipelineStep>
           <PipelineStep n={3} title="Record what happened">
-            Every state change and the event describing it are written in one
-            transaction, in a gapless sequence.
+            Every run and task state change, and the event describing it, are
+            written in one transaction, in a gapless sequence.
           </PipelineStep>
           <PipelineStep n={4} title="Replay the history">
             A pure reducer rebuilds the run&rsquo;s state from the journal
@@ -261,6 +335,12 @@ export default async function Overview() {
           <li>
             <a href={`${REPO}#readme`}>README</a>{" "}
             <span className="detail">what it is, and a demo you can run</span>
+          </li>
+          <li>
+            <Link href="/glossary">Glossary</Link>{" "}
+            <span className="detail">
+              every event in a journal, in plain language
+            </span>
           </li>
           <li>
             <a href={`${REPO}/blob/main/ARCHITECTURE.md`}>Architecture</a>{" "}

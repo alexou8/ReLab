@@ -1,0 +1,26 @@
+name: Documentation problem
+description: Something is wrong, missing, or misleading in the docs, the README, or the dashboard's wording
+labels: ["documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Documentation drift matters more here than in most projects: the
+        documents are the product's argument. A claim that the code does not
+        support is a bug, and this is the right template for it.
+  - type: input
+    id: where
+    attributes:
+      label: Where
+      description: File and section, a URL, or the page and wording in the dashboard.
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is wrong
+      description: >
+        If a document claims something the implementation does not do, say which
+        code you checked. Those are the most valuable reports in this repository.
+    validations:
+      required: true

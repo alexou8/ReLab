@@ -1,0 +1,27 @@
+# The canonical ReLab story end to end: a worker is killed after it has already
+# performed an external side effect but before it could acknowledge the task,
+# and the run still finishes with that side effect having happened exactly once.
+#
+# worker-crash.yaml proves a task comes back after its holder dies. This proves
+# that coming back does not charge the customer twice, which is the claim that
+# decides whether at-least-once delivery is safe to build on. `before-task-ack`
+# is the only trigger point where both are true at once: the effect is recorded
+# and the completion is not.
+#
+# The fault targets attempt 1 only, so attempt 2 can finish. Killing every
+# attempt would test the retry limit instead of recovery.
+name: worker-crash-after-effect
+workflow: effectful.yaml
+seed: 1337
+faults:
+  - type: worker-crash
+    target: {task: charge, attempt: 1}
+    at: before-task-ack
+assert:
+  run_status: SUCCEEDED
+  lost_tasks: 0
+  duplicate_effects: 0
+  # Recovery here is lease expiry plus a reaper sweep, so the budget tracks the
+  # lease duration the suite runs under (2s), not the 30s production default.
+  max_recovery_time_ms: 8000
+  max_retries_per_task: 2

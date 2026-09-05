@@ -123,8 +123,9 @@ and not a cause.
 risks, each with a mitigation, because a security document listing only
 successes is a marketing document.
 
-**Avoid:** implying protection that does not exist. v1 has no authentication and
-says so in three places.
+**Avoid:** implying protection that does not exist. v1's authentication is
+shared bearer tokens with no accounts, no expiry and no audit identity, and the
+documents say exactly that rather than "authenticated".
 
 ---
 

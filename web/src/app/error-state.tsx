@@ -16,18 +16,35 @@ export function ErrorState({ error }: { error: unknown }) {
   const endpoint = error instanceof ApiError ? error.endpoint : "the API";
   const reason =
     error instanceof Error ? error.message : "an unexpected failure";
+  // A reply that arrived and could not be read is a different problem from a
+  // control plane that is not running, and sends the reader somewhere else.
+  const unreadable = error instanceof ApiError && error.unreadable;
 
   return (
     <div className="notice notice-bad" role="alert">
-      <h3>The ReLab control plane could not be reached</h3>
+      <h3>
+        {unreadable
+          ? "The ReLab control plane answered with something unreadable"
+          : "The ReLab control plane could not be reached"}
+      </h3>
       <p>
         <code>{endpoint}</code>: {reason}.
       </p>
       <p>
-        This dashboard is configured to read from <code>{apiBase()}</code>.
-        Start a control plane with <code>relab server</code>, point{" "}
-        <code>RELAB_API_URL</code> somewhere else, or unset it to serve the
-        recorded demo instead.
+        This dashboard is configured to read from <code>{apiBase()}</code>.{" "}
+        {unreadable ? (
+          <>
+            Check that it is a ReLab control plane rather than a proxy or a
+            login page answering in its place, and that its version matches
+            this dashboard.
+          </>
+        ) : (
+          <>
+            Start a control plane with <code>relab server</code>, point{" "}
+            <code>RELAB_API_URL</code> somewhere else, or unset it to serve the
+            recorded demo instead.
+          </>
+        )}
       </p>
       <p>
         Nothing is shown in place of the missing data on purpose. Recorded runs

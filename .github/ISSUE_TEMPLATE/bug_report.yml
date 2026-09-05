@@ -1,0 +1,67 @@
+name: Bug report
+description: Something behaved differently from what the journal or the docs say it should
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A run's event history is usually enough to say what happened without a
+        reproduction, so the journal is the most useful thing you can attach.
+        Please do not paste a connection string, a token, or anything else you
+        would not publish — this repository is public.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you expected, and what you got instead.
+    validations:
+      required: true
+  - type: textarea
+    id: journal
+    attributes:
+      label: The run's journal
+      description: >
+        Output of `relab run inspect <run-id>`, or the run exported with
+        `relab export <run-id>`. If the run does not exist — a crash before it
+        was created, a failed migration — say so and paste the command output.
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: ReLab version
+      description: "`relab --version`, or the commit you built from."
+    validations:
+      required: true
+  - type: dropdown
+    id: how-run
+    attributes:
+      label: How are you running it
+      options:
+        - docker compose (the stack in this repository)
+        - Binaries against my own PostgreSQL
+        - Tests only (make check / make scenarios / make crash-tests)
+        - The dashboard only
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: postgres
+    attributes:
+      label: PostgreSQL version
+      description: Skip if the issue is in the dashboard or the CLI alone.
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      description: >
+        The workflow and scenario files if you can share them, and the commands
+        you ran. A scenario that reproduces it is ideal; the seed matters.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before filing
+      options:
+        - label: I checked `docs/reliability.md`, in case this is a documented limitation rather than a bug
+          required: true
+        - label: This is not a security issue (those go through SECURITY.md, not a public issue)
+          required: true
