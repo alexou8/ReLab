@@ -27,6 +27,12 @@ each such change is listed here:
 - `LICENSE` (Apache-2.0), `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SUPPORT.md`,
   issue and pull-request templates, and a vulnerability reporting policy in
   `SECURITY.md`.
+- `docs/guarantees.md`: every public reliability claim beside the test that
+  proves it, how to run it, and an explicit list of what no test proves yet.
+  `test/docs` fails if the matrix cites a test that does not exist.
+- `docs/openapi.yaml`: the read API described, including the health and
+  readiness endpoints. `internal/api/openapi_test.go` compares it against the
+  structs the handlers return, so a renamed field fails the build.
 - `.codex/` orchestration configuration for the agents developing this
   repository, described in `docs/orchestration.md`.
 
@@ -39,6 +45,9 @@ each such change is listed here:
 
 ### Changed
 
+- `docs/reliability.md` said the duplicate-attempt check runs in every
+  process-level crash test. Two of the five call it; corrected, and the retry
+  path now cites its own test.
 - Corrected claims the implementation does not support: `WORKER_REGISTERED`,
   `WORKER_HEARTBEAT` and `WORKER_SUSPECT` are defined types that are never
   written to a journal; `WORKER_LOST` also covers a deliberate shutdown holding

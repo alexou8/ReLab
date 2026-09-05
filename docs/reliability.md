@@ -5,7 +5,10 @@ package documentation and this file disagree, this file is correct and the
 others are bugs.
 
 Every claim here is backed by a test named in the text. A claim without a test
-does not belong in this document.
+does not belong in this document. [`guarantees.md`](guarantees.md) is the same
+mapping as a table, together with how to run each test and an explicit list of
+what no test proves yet; `test/docs` fails the build if it cites a test that
+does not exist.
 
 ---
 
@@ -27,7 +30,8 @@ between leaving work stranded and running it twice. ReLab chooses to run it
 twice, and bounds the damage with the idempotency ledger.
 
 *Tested by:* `TestSIGKILLedWorkerLosesItsTaskAndTheRunStillSucceeds`,
-`TestLeaseExpiryRequeuesTheTask`.
+`TestLeaseExpiryRequeuesTheTask`,
+`TestFailingTaskRetriesThenDeadLettersAndFailsTheRun` for the retry case.
 
 ---
 
@@ -75,7 +79,10 @@ the case the idempotency ledger exists for.
 
 *Tested by:* `TestThreeWorkersProcessAFanOutWithoutDoubleExecution`,
 `TestConcurrentAttemptIsRefused`, and the `assertNoDuplicateAttempt` check in
-every process-level crash test.
+`TestSIGKILLedWorkerLosesItsTaskAndTheRunStillSucceeds` and
+`TestEffectSurvivesACrashBeforeAcknowledgement`. (It was previously described
+here as running in every process-level crash test, which it does not: two of
+the five call it.)
 
 ---
 

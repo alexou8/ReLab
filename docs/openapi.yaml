@@ -1,0 +1,341 @@
+openapi: 3.1.0
+info:
+  title: ReLab read API
+  version: "1"
+  summary: Read-only access to runs, tasks, events, workers and workflows.
+  description: |
+    ReLab's HTTP API is read-only. Everything that changes state goes through
+    the engine, which the CLI and the workers use directly, so there is one
+    implementation of a state change and not two.
+
+    **There is no authentication and no authorisation in v1.** Anyone who can
+    reach this API can read every run. That is a scope decision, documented in
+    SECURITY.md; do not expose an instance to a network you do not control.
+
+    Field names are Go field names, because the engine's structs are serialised
+    as they are — `ID`, `WorkflowName`, `CreatedAt`. `internal/api/openapi_test.go`
+    compares this file against those structs, so a renamed field fails the build
+    rather than silently making this document wrong.
+  license:
+    name: Apache-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+servers:
+  - url: http://localhost:8080
+    description: A local control plane started with `relab server`
+tags:
+  - name: health
+  - name: runs
+  - name: fleet
+paths:
+  /healthz:
+    get:
+      tags: [health]
+      summary: Liveness
+      description: Answers as soon as the HTTP server is listening. It says nothing about the database.
+      responses:
+        "200":
+          description: The process is up.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: ok }
+                  version: { type: string }
+  /readyz:
+    get:
+      tags: [health]
+      summary: Readiness
+      description: |
+        Reports whether the process can actually serve: the database is
+        reachable, and its schema matches the version this binary was built for.
+        The two are separate conditions because they need different responses —
+        a database that is down comes back on its own, a schema mismatch needs a
+        deploy or a rollback. The reason names which, and never a table, a query
+        or a DSN.
+      responses:
+        "200":
+          description: Ready to take traffic.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: ready }
+                  schema_version: { type: integer }
+        "503":
+          description: Not taking traffic.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: unavailable }
+                  reason: { type: string }
+  /api/v1/workflows:
+    get:
+      tags: [runs]
+      summary: Registered workflow definitions
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 100 }
+      responses:
+        "200":
+          description: The workflows, newest first.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  workflows:
+                    type: array
+                    items: { $ref: "#/components/schemas/Workflow" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /api/v1/runs:
+    get:
+      tags: [runs]
+      summary: Runs, newest first
+      parameters:
+        - name: status
+          in: query
+          description: Filter by run status. An unknown value matches nothing rather than erroring.
+          schema: { $ref: "#/components/schemas/RunStatus" }
+        - name: workflow
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50 }
+      responses:
+        "200":
+          description: The matching runs.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  runs:
+                    type: array
+                    items: { $ref: "#/components/schemas/Run" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /api/v1/runs/{runID}:
+    get:
+      tags: [runs]
+      summary: One run
+      parameters:
+        - $ref: "#/components/parameters/RunID"
+      responses:
+        "200":
+          description: The run.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Run" }
+        "400": { $ref: "#/components/responses/BadRunID" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /api/v1/runs/{runID}/tasks:
+    get:
+      tags: [runs]
+      summary: The run's tasks
+      parameters:
+        - $ref: "#/components/parameters/RunID"
+      responses:
+        "200":
+          description: The tasks, one row per step of the workflow.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tasks:
+                    type: array
+                    items: { $ref: "#/components/schemas/Task" }
+        "400": { $ref: "#/components/responses/BadRunID" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /api/v1/runs/{runID}/events:
+    get:
+      tags: [runs]
+      summary: The run's journal
+      description: |
+        The append-only event history, in sequence order. Sequence numbers are
+        gapless: a gap means data was lost, not that something was skipped. A
+        finished run's terminal event is its last, so this response cannot grow
+        once the run has completed.
+      parameters:
+        - $ref: "#/components/parameters/RunID"
+      responses:
+        "200":
+          description: Every event of the run, ascending by Seq.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  events:
+                    type: array
+                    items: { $ref: "#/components/schemas/Event" }
+        "400": { $ref: "#/components/responses/BadRunID" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /api/v1/workers:
+    get:
+      tags: [fleet]
+      summary: Worker liveness
+      responses:
+        "200":
+          description: Every worker the control plane knows about.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  workers:
+                    type: array
+                    items: { $ref: "#/components/schemas/Worker" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /api/v1/stats:
+    get:
+      tags: [fleet]
+      summary: Counts by status, queue depth and dead letters
+      responses:
+        "200":
+          description: Current counters.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Stats" }
+        "500": { $ref: "#/components/responses/InternalError" }
+components:
+  parameters:
+    RunID:
+      name: runID
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+  responses:
+    BadRunID:
+      description: The run id in the path is not a UUID.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: No run with that id.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    InternalError:
+      description: |
+        Something failed inside the server. The body carries a category and
+        never an internal detail; the full error is logged with the request id.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: A category, such as "not found" or "internal error". Never a query, a table or a DSN.
+    RunStatus:
+      type: string
+      enum: [CREATED, QUEUED, RUNNING, SUCCEEDED, FAILED, CANCELLED]
+    TaskStatus:
+      type: string
+      enum: [PENDING, READY, LEASED, RUNNING, SUCCEEDED, FAILED, RETRYING, DEAD]
+    WorkerStatus:
+      type: string
+      enum: [HEALTHY, SUSPECT, LOST, STOPPED]
+    Workflow:
+      type: object
+      properties:
+        ID: { type: string, format: uuid }
+        Name: { type: string }
+        Version: { type: integer }
+        YAML: { type: string }
+        Hash: { type: string }
+        CreatedAt: { type: string, format: date-time }
+    Run:
+      type: object
+      properties:
+        ID: { type: string, format: uuid }
+        WorkflowID: { type: string, format: uuid }
+        WorkflowName: { type: string }
+        WorkflowVer: { type: integer }
+        Status: { $ref: "#/components/schemas/RunStatus" }
+        ScenarioName:
+          type: string
+          description: Empty when the run was not disrupted on purpose.
+        Seed:
+          type: integer
+          format: int64
+          description: Drives the run's deterministic RNG. Recorded even when it was chosen, so a run is reproducible after the fact.
+        EventSeq:
+          type: integer
+          format: int64
+          description: The highest sequence number allocated for this run.
+        CorrelationID: { type: string }
+        FailureReason: { type: string }
+        CreatedAt: { type: string, format: date-time }
+        StartedAt: { type: [string, "null"], format: date-time }
+        CompletedAt: { type: [string, "null"], format: date-time }
+    Task:
+      type: object
+      properties:
+        ID: { type: string, format: uuid }
+        RunID: { type: string, format: uuid }
+        Name: { type: string }
+        Attempt:
+          type: integer
+          description: Counts from 0 before the first claim, so a task that has run once has Attempt 1.
+        MaxAttempts: { type: integer }
+        Status: { $ref: "#/components/schemas/TaskStatus" }
+        WorkerID: { type: [string, "null"], format: uuid }
+        LeaseExpiresAt: { type: [string, "null"], format: date-time }
+        ScheduledAt: { type: string, format: date-time }
+        StartedAt: { type: [string, "null"], format: date-time }
+        CompletedAt: { type: [string, "null"], format: date-time }
+        Output: { description: The handler's result, as recorded. Any JSON. }
+        Error: { type: string }
+        IdempotencyKey: { type: string }
+    Event:
+      type: object
+      properties:
+        RunID: { type: string, format: uuid }
+        Seq:
+          type: integer
+          format: int64
+          description: Gapless within a run, starting at 1.
+        Type:
+          type: string
+          description: The event type. An unknown type is an error to a reader, never something to skip.
+        TaskName: { type: string }
+        WorkerID: { type: [string, "null"], format: uuid }
+        Payload: { description: Versioned payload for this event type. See DATA.md. }
+        OccurredAt: { type: string, format: date-time }
+    Worker:
+      type: object
+      properties:
+        ID: { type: string, format: uuid }
+        Hostname: { type: string }
+        Version: { type: string }
+        Status: { $ref: "#/components/schemas/WorkerStatus" }
+        Capacity: { type: integer }
+        ActiveTasks: { type: integer }
+        LastHeartbeat: { type: string, format: date-time }
+        RegisteredAt: { type: string, format: date-time }
+    Stats:
+      type: object
+      properties:
+        runs_by_status:
+          type: object
+          additionalProperties: { type: integer }
+        tasks_by_status:
+          type: object
+          additionalProperties: { type: integer }
+        workers_by_status:
+          type: object
+          additionalProperties: { type: integer }
+        queue_depth: { type: integer }
+        dead_letters: { type: integer }

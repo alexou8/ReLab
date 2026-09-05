@@ -511,6 +511,8 @@ and the residual risks: [`docs/deployment.md`](docs/deployment.md).
 | [`CLAUDE.md`](CLAUDE.md) | Conventions for changing this repository |
 | [`AGENTS.md`](AGENTS.md) | Sharp edges, and what to verify before calling work done |
 | [`SKILLS.md`](SKILLS.md) | Engineering practices this project holds itself to |
+| [`docs/guarantees.md`](docs/guarantees.md) | Every reliability claim, and the test that proves it |
+| [`docs/openapi.yaml`](docs/openapi.yaml) | The read API, described |
 | [`docs/benchmarks.md`](docs/benchmarks.md) | Measured numbers, with methodology |
 | [`docs/deployment.md`](docs/deployment.md) | How it is deployed, and what the deployment does not do |
 | [`docs/orchestration.md`](docs/orchestration.md) | How the agents developing this repository are set up and coordinated |
