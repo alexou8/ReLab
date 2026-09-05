@@ -28,3 +28,20 @@
 .DS_Store
 .idea/
 *.swp
+
+# Credentials. This repository is public; nothing below may ever be committed.
+#
+# Codex signs in with ChatGPT and caches the login in the user's private
+# ~/.codex directory. .codex/ here holds only project configuration and agent
+# definitions, so the credential files are excluded by name in case a Codex
+# run ever writes them into the project directory.
+.codex/auth.json
+**/auth.json
+.env.*
+!.env.example
+!**/.env.example
+*.pem
+*.key
+!web/**/*.key.ts
+id_rsa*
+*credentials*.json

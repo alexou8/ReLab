@@ -502,3 +502,4 @@ and the residual risks: [`docs/deployment.md`](docs/deployment.md).
 | [`SKILLS.md`](SKILLS.md) | Engineering practices this project holds itself to |
 | [`docs/benchmarks.md`](docs/benchmarks.md) | Measured numbers, with methodology |
 | [`docs/deployment.md`](docs/deployment.md) | How it is deployed, and what the deployment does not do |
+| [`docs/orchestration.md`](docs/orchestration.md) | How the agents developing this repository are set up and coordinated |

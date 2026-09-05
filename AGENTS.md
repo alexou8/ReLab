@@ -112,6 +112,71 @@ Beyond the table in `CLAUDE.md`:
 - `-short` skips the process and corpus suites. Do not add anything else to that
   exclusion.
 
+## Orchestration: who writes what
+
+This repository is developed by more than one agent. The split below is a
+coordination rule, not a suggestion; ignoring it produces conflicting edits to
+the same file.
+
+| Role | Owns |
+|---|---|
+| Claude Opus | Scope, product direction, frontend information architecture, UX, visual design, integration, and the final decision on any disagreement |
+| GPT-5.6 Sol (Codex) | Backend engineering co-planning, challenging assumptions, coordinating Luna subagents, cross-cutting implementation |
+| `luna-explorer` | Read-only investigation; returns file references, never edits |
+| `luna-implementer` | One bounded implementation with focused tests |
+| `luna-tester` | Verification only; does not change production code |
+| `luna-risk-reviewer` | Read-only security, concurrency, migration, and data-loss review |
+
+Rules:
+
+1. **One writer per file or subsystem at a time.** Parallel agents may read the
+   same code; they must not edit overlapping paths. For write-heavy work use one
+   writer plus read-only reviewers.
+2. Sol may disagree with Opus and must state the evidence and the tradeoff.
+   Opus resolves it.
+3. Every task packet names the allowed files, the expected output, the tests to
+   run, and the stopping condition.
+4. Agents return summaries, paths, commands, and results — not raw logs, unless
+   a failing excerpt is needed.
+5. No more than three Luna agents run concurrently (four only for a release
+   audit).
+6. Do not re-read the whole repository on every delegation. The parent supplies
+   the constraints that matter.
+7. Reuse the active Sol thread within a milestone; start a fresh one between
+   unrelated milestones.
+8. The automatic Codex review gate stays disabled during normal development.
+9. No claim about production readiness, security, performance, adoption, or
+   exactly-once execution ships without measured evidence. ReLab's semantics are
+   at-least-once and stay described that way.
+
+Agent definitions live in `.codex/agents/`; project Codex settings in
+`.codex/config.toml`. Both are configuration only and contain no credentials.
+
+## Secret handling
+
+This repository is public. Treat every file here as published the moment it is
+committed.
+
+- Codex authenticates with **Sign in with ChatGPT**. Do not configure
+  `OPENAI_API_KEY`, `CODEX_API_KEY`, `--with-api-key`, or a custom provider.
+- The login cache is `~/.codex/auth.json`, outside the repository. Never copy it
+  in, never paste it into a prompt, an issue, a log, or CI output, and never
+  place it in a build artifact or shared cache. In a fresh cloud environment,
+  run `codex login --device-auth` again rather than transporting the file.
+- `.gitignore` excludes `**/auth.json`, `.env.*` (except `.env.example`), keys,
+  and `*credentials*.json`. Adding a new kind of secret file means adding a new
+  ignore rule in the same change.
+- The only credentials that may appear in tracked files are the throwaway
+  `relab:relab` PostgreSQL development values in `docker-compose.yml`, the
+  `Makefile`, and CI. They exist so a reviewer can start a local stack; they are
+  not usable against anything real, and no other literal credential belongs in
+  the tree.
+- Connection strings are redacted before they reach a log
+  (`internal/store/redact.go`). Keep it that way: a DSN password must not appear
+  in an error message, a test failure, or an agent report.
+- If a secret is ever committed, rotate it first and then remove it. Deleting
+  the commit is not a fix on a public repository.
+
 ## Validation before considering work complete
 
 Run all of these. "It builds" is not done.
